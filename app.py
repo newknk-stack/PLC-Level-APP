@@ -1,21 +1,88 @@
+from google.oauth2.service_account import Credentials
+import gspread
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
 
 # 평가 항목 및 기본 정보 정의
 ITEMS = ["S/W 분석 및 이해", "발표 자료 완성도", "발표력", "활용도", "S/W 난이도"]
 EVALUATORS = ["정준영", "차영진", "김태환", "김남권", "최치웅"]
 TARGETS = [
-    "박상규 CL4", "이영표 CL4", "이윤열 CL3", "임성민 CL4", "김용남 CL3", "왕종표 CL4", "이동민 CL4", 
-    "이준식 CL4", "이진호 CL4", "길지훈 CL4", "이창배 CL3", "채경용 CL4", "하운기 CL4", "박광윤 CL4", 
-    "안상윤 CL3", "오성균 CL4", "이동준 CL4", "임채환 CL4", "권준성 CL3", "서창성 CL3", "유승우 CL4", 
-    "이도윤 CL3", "박시후 CL4", "손병효 CL3", "이준혁 CL4", "장정윤 CL3", "한정훈 CL4"
+    "박상규 CL4",
+    "이영표 CL4",
+    "이윤열 CL3",
+    "임성민 CL4",
+    "김용남 CL3",
+    "왕종표 CL4",
+    "이동민 CL4",
+    "이준식 CL4",
+    "이진호 CL4",
+    "길지훈 CL4",
+    "이창배 CL3",
+    "채경용 CL4",
+    "하운기 CL4",
+    "박광윤 CL4",
+    "안상윤 CL3",
+    "오성균 CL4",
+    "이동준 CL4",
+    "임채환 CL4",
+    "권준성 CL3",
+    "서창성 CL3",
+    "유승우 CL4",
+    "이도윤 CL3",
+    "박시후 CL4",
+    "손병효 CL3",
+    "이준혁 CL4",
+    "장정윤 CL3",
+    "한정훈 CL4",
 ]
 
 # 페이지 기본 설정
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
+
+
+# -------------------------------------------------------------------
+# 📊 [신규] 2026년 상반기 역량 진단 데이터 파싱 함수
+# -------------------------------------------------------------------
+@st.cache_data
+def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
+    try:
+        df_raw = pd.read_excel(excel_path)
+        data = []
+        # 첫번째 열(역량레벨) 제외하고 인원별 열 순회
+        for col in df_raw.columns[1:]:
+            grade = col.split(".")[0]  # S, A, B, C, D 등급
+            name = df_raw[col].iloc[0]  # 이름
+
+            # Level별 건수 및 비율 파싱
+            l0_cnt = int(df_raw[col].iloc[1])
+            l0_pct = float(df_raw[col].iloc[2]) * 100
+
+            l1_cnt = int(df_raw[col].iloc[3])
+            l1_pct = float(df_raw[col].iloc[4]) * 100
+
+            l2_cnt = int(df_raw[col].iloc[5])
+            l2_pct = float(df_raw[col].iloc[6]) * 100
+
+            data.append({
+                "이름": name,
+                "등급": grade,
+                "L0_cnt": l0_cnt,
+                "L0_pct": round(l0_pct, 1),
+                "L1_cnt": l1_cnt,
+                "L1_pct": round(l1_pct, 1),
+                "L2_cnt": l2_cnt,
+                "L2_pct": round(l2_pct, 1),
+            })
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.warning(f"사전 역량 진단표 파일 로드 중 참고용 데이터 오류: {e}")
+        return pd.DataFrame()
+
+
+# 사전 진단 데이터 로드
+df_comp = load_competency_data()
 
 # -------------------------------------------------------------------
 # 🔐 공동 로그인 로직
@@ -25,7 +92,9 @@ if "logged_in" not in st.session_state:
 
 if not st.session_state["logged_in"]:
     st.title("🔐 PLC S/W 역량 진단 평가 시스템")
-    st.write("시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요.")
+    st.write(
+        "시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요."
+    )
 
     with st.form("login_form"):
         user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
@@ -33,18 +102,21 @@ if not st.session_state["logged_in"]:
         submit = st.form_submit_button("로그인")
 
         if submit:
-            # Secrets에서 공동 비밀번호 가져오기
-            correct_pw = st.secrets.get("common_password", "2026")  # 기본값 1234
-            
+            correct_pw = st.secrets.get("common_password", "2026")
+
             if input_pw == str(correct_pw):
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user_name
-                st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
+                st.success(
+                    f"반갑습니다, {user_name}님! 시스템에 접속합니다."
+                )
                 st.rerun()
             else:
-                st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
+                st.error(
+                    "비밀번호가 올바르지 않습니다. 다시 확인해 주세요."
+                )
 
-    st.stop()  # 로그인되지 않은 경우 아래 코드를 실행하지 않음
+    st.stop()
 
 # -------------------------------------------------------------------
 # 👤 사이드바 (접속자 정보 및 로그아웃)
@@ -59,6 +131,7 @@ if st.sidebar.button("🚪 로그아웃", type="secondary"):
 
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
+
 # -------------------------------------------------------------------
 # 구글 시트 연동 설정 (gspread + google.oauth2)
 # -------------------------------------------------------------------
@@ -66,16 +139,19 @@ st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 def get_gspread_client():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
+        "https://www.googleapis.com/auth/drive",
     ]
     creds_dict = dict(st.secrets["gcp_service_account"])
-    
+
     if "\\n" in creds_dict["private_key"]:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        
+        creds_dict["private_key"] = creds_dict["private_key"].replace(
+            "\\n", "\n"
+        )
+
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     return client
+
 
 def get_worksheet():
     client = get_gspread_client()
@@ -83,7 +159,7 @@ def get_worksheet():
     sheet = client.open_by_url(sheet_url).sheet1
     return sheet
 
-# 데이터 불러오기 함수
+
 def load_data():
     try:
         sheet = get_worksheet()
@@ -96,7 +172,7 @@ def load_data():
         st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
-# 등급 산출 함수
+
 def calculate_grade(avg_score):
     if avg_score >= 9.0:
         return "S"
@@ -109,11 +185,12 @@ def calculate_grade(avg_score):
     else:
         return "D"
 
+
 # 탭 구성
 tab1, tab2, tab3 = st.tabs([
-    "📝 평가 입력", 
-    "📊 종합 평가 결과 대시보드", 
-    "🔍 평가자별/대상자별 상세 조회"
+    "📝 평가 입력",
+    "📊 종합 평가 결과 대시보드",
+    "🔍 평가자별/대상자별 상세 조회",
 ])
 
 # -------------------------------------------------------------------
@@ -122,14 +199,65 @@ tab1, tab2, tab3 = st.tabs([
 with tab1:
     st.subheader("평가 점수 제출")
 
-    # 로그인한 사용자 이름으로 평가자 자동 고정
     evaluator = st.session_state["user_name"]
 
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input("평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True)
+        st.text_input(
+            "평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True
+        )
     with col2:
         target = st.selectbox("평가 대상자 선택", TARGETS)
+
+    # ---------------------------------------------------------------
+    # 📌 [신규 반영] 선택된 대상자의 사전 역량 진단 참고 정보표출
+    # ---------------------------------------------------------------
+    if target and not df_comp.empty:
+        # '박상규 CL4' -> '박상규' 이름만 분리
+        target_clean_name = target.split()[0]
+        match = df_comp[df_comp["이름"] == target_clean_name]
+
+        if not match.empty:
+            t_info = match.iloc[0]
+            st.markdown("---")
+
+            # 등급 배지 표기 스타일
+            grade_badge = {
+                "S": "🟣 S등급 (최우수)",
+                "A": "🔵 A등급 (우수)",
+                "B": "🟢 B등급 (숙련)",
+                "C": "🟡 C등급 (보통)",
+                "D": "🔴 D등급 (기초)",
+            }.get(t_info["등급"], f"{t_info['등급']} 등급")
+
+            st.markdown(
+                f"##### 💡 **[{target}]** 님의 사전 역량 진단 참고 현황"
+            )
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("사전 진단 등급", grade_badge)
+            m2.metric(
+                "Level 2 (우수/숙련)",
+                f"{t_info['L2_cnt']}건",
+                f"{t_info['L2_pct']}%",
+            )
+            m3.metric(
+                "Level 1 (보통/실무)",
+                f"{t_info['L1_cnt']}건",
+                f"{t_info['L1_pct']}%",
+            )
+            m4.metric(
+                "Level 0 (기초/미흡)",
+                f"{t_info['L0_cnt']}건",
+                f"{t_info['L0_pct']}%",
+                delta_color="inverse",
+            )
+
+            st.caption("역량 수준별 분포 (Level 2 비중)")
+            st.progress(
+                int(t_info["L2_pct"]),
+                text=f"Level 2: {t_info['L2_pct']}% | Level 1: {t_info['L1_pct']}% | Level 0: {t_info['L0_pct']}%",
+            )
 
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
@@ -143,8 +271,10 @@ with tab1:
     if st.button("점수 저장 및 제출", type="primary"):
         try:
             df = load_data()
-            
-            existing_idx = df[(df["evaluator"] == evaluator) & (df["target"] == target)].index
+
+            existing_idx = df[
+                (df["evaluator"] == evaluator) & (df["target"] == target)
+            ].index
             new_row = {"evaluator": evaluator, "target": target, **scores}
 
             if len(existing_idx) > 0:
@@ -156,8 +286,10 @@ with tab1:
             sheet = get_worksheet()
             sheet.clear()
             sheet.update([df.columns.values.tolist()] + df.values.tolist())
-            
-            st.success(f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 성공적으로 저장되었습니다!")
+
+            st.success(
+                f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 성공적으로 저장되었습니다!"
+            )
         except Exception as e:
             st.error(f"저장 중 오류가 발생했습니다: {e}")
 
@@ -172,7 +304,7 @@ with tab2:
         st.info("아직 입력된 평가 데이터가 없습니다.")
     else:
         for item in ITEMS:
-            df[item] = pd.to_numeric(df[item], errors='coerce').fillna(0)
+            df[item] = pd.to_numeric(df[item], errors="coerce").fillna(0)
 
         summary_list = []
         for target_person in df["target"].unique():
@@ -186,7 +318,7 @@ with tab2:
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_avg, 2),
-                "기술 평가 등급": grade
+                "기술 평가 등급": grade,
             }
             for item in ITEMS:
                 row[item] = round(item_means[item], 2)
@@ -197,31 +329,40 @@ with tab2:
         st.dataframe(summary_df, use_container_width=True)
 
         st.markdown("### 🏆 등급 현황 통계")
-        grade_counts = summary_df["기술 평가 등급"].value_counts().reindex(["S", "A", "B", "C", "D"], fill_value=0)
+        grade_counts = (
+            summary_df["기술 평가 등급"]
+            .value_counts()
+            .reindex(["S", "A", "B", "C", "D"], fill_value=0)
+        )
 
         c1, c2, c3, c4, c5 = st.columns(5)
         for i, g in enumerate(["S", "A", "B", "C", "D"]):
             eval(f"c{i+1}").metric(f"{g} 등급", f"{grade_counts[g]} 명")
 
         st.markdown("### 📈 피평가자별 역량 방사형 차트")
-        selected_target = st.selectbox("분석할 대상자 선택", summary_df["피평가자"].unique())
+        selected_target = st.selectbox(
+            "분석할 대상자 선택", summary_df["피평가자"].unique()
+        )
 
-        target_info = summary_df[summary_df["피평가자"] == selected_target].iloc[0]
+        target_info = summary_df[
+            summary_df["피평가자"] == selected_target
+        ].iloc[0]
 
-        radar_df = pd.DataFrame({
-            "항목": ITEMS,
-            "점수": [target_info[item] for item in ITEMS]
-        })
+        radar_df = pd.DataFrame(
+            {"항목": ITEMS, "점수": [target_info[item] for item in ITEMS]}
+        )
 
-        fig = px.line_polar(radar_df, r='점수', theta='항목', line_close=True, range_r=[0, 10])
-        fig.update_traces(fill='toself')
+        fig = px.line_polar(
+            radar_df, r="점수", theta="항목", line_close=True, range_r=[0, 10]
+        )
+        fig.update_traces(fill="toself")
         st.plotly_chart(fig, use_container_width=True)
 
         st.download_button(
             label="📥 평가 집계 결과 엑셀(CSV) 다운로드",
-            data=summary_df.to_csv(index=False).encode('utf-8-sig'),
+            data=summary_df.to_csv(index=False).encode("utf-8-sig"),
             file_name="PLC_Software_역량진단_결과.csv",
-            mime="text/csv"
+            mime="text/csv",
         )
 
 # -------------------------------------------------------------------
@@ -236,44 +377,65 @@ with tab3:
     evaluator_list = ["전체"] + EVALUATORS
     target_list = ["전체"] + TARGETS
 
-    # 기본적으로 로그인한 사용자가 기본 선택되도록 설정
-    default_eval_idx = evaluator_list.index(st.session_state["user_name"]) if st.session_state["user_name"] in evaluator_list else 0
+    default_eval_idx = (
+        evaluator_list.index(st.session_state["user_name"])
+        if st.session_state["user_name"] in evaluator_list
+        else 0
+    )
 
     with filter_col1:
-        sel_evaluator = st.selectbox("👤 평가자 필터", evaluator_list, index=default_eval_idx)
+        sel_evaluator = st.selectbox(
+            "👤 평가자 필터", evaluator_list, index=default_eval_idx
+        )
     with filter_col2:
         sel_target = st.selectbox("🎯 평가 대상자 필터", target_list)
 
-    # 📌 특정 평가자를 선택한 경우: 미평가 대상자 현황 표시
     if sel_evaluator != "전체":
-        evaluated_targets = df[df["evaluator"] == sel_evaluator]["target"].tolist() if not df.empty else []
-        not_evaluated_targets = [t for t in TARGETS if t not in evaluated_targets]
-        
+        evaluated_targets = (
+            df[df["evaluator"] == sel_evaluator]["target"].tolist()
+            if not df.empty
+            else []
+        )
+        not_evaluated_targets = [
+            t for t in TARGETS if t not in evaluated_targets
+        ]
+
         st.markdown("---")
         m_col1, m_col2 = st.columns(2)
-        m_col1.metric("진행한 평가 건수", f"{len(evaluated_targets)} / {len(TARGETS)} 명")
+        m_col1.metric(
+            "진행한 평가 건수", f"{len(evaluated_targets)} / {len(TARGETS)} 명"
+        )
         m_col2.metric("남은 미평가 인원", f"{len(not_evaluated_targets)} 명")
-        
+
         if not_evaluated_targets:
-            with st.expander(f"⚠️ [{sel_evaluator}] 평가자가 아직 평가하지 않은 대상자 목록 ({len(not_evaluated_targets)}명)", expanded=True):
+            with st.expander(
+                f"⚠️ [{sel_evaluator}] 평가자가 아직 평가하지 않은 대상자 목록 ({len(not_evaluated_targets)}명)",
+                expanded=True,
+            ):
                 cols_per_row = 4
                 for i in range(0, len(not_evaluated_targets), cols_per_row):
                     cols = st.columns(cols_per_row)
-                    for j, target_name in enumerate(not_evaluated_targets[i:i+cols_per_row]):
+                    for j, target_name in enumerate(
+                        not_evaluated_targets[i : i + cols_per_row]
+                    ):
                         cols[j].write(f"• {target_name}")
         else:
-            st.success(f"🎉 [{sel_evaluator}] 평가자는 모든 대상자에 대한 평가를 완료했습니다!")
+            st.success(
+                f"🎉 [{sel_evaluator}] 평가자는 모든 대상자에 대한 평가를 완료했습니다!"
+            )
         st.markdown("---")
 
-    # 평가 내역 테이블 출력
     if df.empty or len(df) == 0:
         st.info("아직 입력된 평가 데이터가 없습니다.")
     else:
         for item in ITEMS:
-            df[item] = pd.to_numeric(df[item], errors='coerce').fillna(0)
+            df[item] = pd.to_numeric(df[item], errors="coerce").fillna(0)
 
         display_df = df.copy()
-        display_df.rename(columns={"evaluator": "평가자", "target": "평가 대상자"}, inplace=True)
+        display_df.rename(
+            columns={"evaluator": "평가자", "target": "평가 대상자"},
+            inplace=True,
+        )
         display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(2)
 
         filtered_df = display_df.copy()
@@ -284,5 +446,7 @@ with tab3:
         if sel_target != "전체":
             filtered_df = filtered_df[filtered_df["평가 대상자"] == sel_target]
 
-        st.markdown(f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**")
+        st.markdown(
+            f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
+        )
         st.dataframe(filtered_df, use_container_width=True)
