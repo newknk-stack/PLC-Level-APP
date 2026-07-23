@@ -105,23 +105,22 @@ df_comp = load_competency_data()
 
 
 # -------------------------------------------------------------------
-# 🎨 등급별 텍스트 색상 스타일링 함수
+# 🎨 등급별 개별 HTML 색상 생성 함수 (괄호 안의 등급도 각각의 색상 적용)
 # -------------------------------------------------------------------
-def style_grade_column(val):
-    val_str = str(val).strip()
-    if val_str.startswith("S"):
-        color = "#8E44AD"  # 보라색
-    elif val_str.startswith("A"):
-        color = "#2980B9"  # 파란색
-    elif val_str.startswith("B"):
-        color = "#27AE60"  # 초록색
-    elif val_str.startswith("C"):
-        color = "#D35400"  # 주황/황갈색
-    elif val_str.startswith("D"):
-        color = "#C0392B"  # 빨간색
-    else:
-        color = "inherit"
-    return f"color: {color}; font-weight: bold;"
+def get_colored_grade_html(est_grade, pre_grade):
+    color_map = {
+        "S": "#8E44AD",  # 보라색
+        "A": "#2980B9",  # 파란색
+        "B": "#27AE60",  # 초록색
+        "C": "#D35400",  # 주황색
+        "D": "#C0392B",  # 빨간색
+    }
+
+    c_est = color_map.get(str(est_grade).strip()[0:1], "#333333")
+    c_pre = color_map.get(str(pre_grade).strip()[0:1], "#333333")
+
+    html_str = f'<span style="color: {c_est}; font-weight: bold;">{est_grade}</span> (<span style="color: {c_pre}; font-weight: bold;">{pre_grade}</span>)'
+    return html_str
 
 
 def get_pre_grade(target_full_name):
@@ -145,6 +144,40 @@ def calculate_grade(avg_score):
         return "C"
     else:
         return "D"
+
+
+# HTML 테이블 렌더링용 스타일
+TABLE_STYLE = """
+<style>
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        font-size: 0.95rem;
+        font-family: sans-serif;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .styled-table thead tr {
+        background-color: #0E1117;
+        color: #ffffff;
+        text-align: center;
+        font-weight: bold;
+    }
+    .styled-table th, .styled-table td {
+        padding: 10px 12px;
+        text-align: center;
+        border-bottom: 1px solid #dddddd;
+    }
+    .styled-table tbody tr:nth-of-type(even) {
+        background-color: #f8f9fa;
+    }
+    .styled-table tbody tr:hover {
+        background-color: #f1f3f5;
+    }
+</style>
+"""
 
 
 # -------------------------------------------------------------------
@@ -362,6 +395,7 @@ with tab2:
 
         summary_list = []
         raw_grades_list = []  # 통계 계산용 순수 등급 저장
+        download_list = []  # CSV 다운로드용 순수 텍스트 저장
 
         for target_person in df["target"].unique():
             sub_df = df[df["target"] == target_person]
@@ -373,32 +407,40 @@ with tab2:
             pre_grade = get_pre_grade(target_person)
             raw_grades_list.append(est_grade)
 
-            # 등급(사전) 문자열 조합 (예: A (S))
-            combined_grade = f"{est_grade} ({pre_grade})"
+            # 각각 등급에 맞는 개별 색상 HTML 적용
+            colored_grade_html = get_colored_grade_html(est_grade, pre_grade)
 
+            # 화면 출력용 (소수점 첫째 자리 반영)
             row = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
-                "종합 평균점수": round(total_avg, 2),
-                "기술 평가 등급(사전)": combined_grade,
+                "종합 평균점수": round(total_avg, 1),
+                "기술 평가 등급(사전)": colored_grade_html,
             }
+            # 엑셀/CSV 다운로드용 (순수 텍스트)
+            row_dl = {
+                "피평가자": target_person,
+                "평가인원": eval_count,
+                "종합 평균점수": round(total_avg, 1),
+                "기술 평가 등급(사전)": f"{est_grade} ({pre_grade})",
+            }
+
             for item in ITEMS:
-                row[item] = round(item_means[item], 2)
+                score_val = round(item_means[item], 1)
+                row[item] = score_val
+                row_dl[item] = score_val
+
             summary_list.append(row)
+            download_list.append(row_dl)
 
         summary_df = pd.DataFrame(summary_list)
+        download_df = pd.DataFrame(download_list)
 
-        # 버전에 상관없이 호환되도록 map() 및 applymap() 폴백 처리
-        try:
-            styled_summary_df = summary_df.style.map(
-                style_grade_column, subset=["기술 평가 등급(사전)"]
-            )
-        except AttributeError:
-            styled_summary_df = summary_df.style.applymap(
-                style_grade_column, subset=["기술 평가 등급(사전)"]
-            )
-
-        st.dataframe(styled_summary_df, use_container_width=True)
+        # HTML 스타일 적용 표 출력
+        html_table = summary_df.to_html(
+            index=False, escape=False, classes="styled-table"
+        )
+        st.markdown(TABLE_STYLE + html_table, unsafe_allow_html=True)
 
         st.markdown("### 🏆 등급 현황 통계")
         grade_series = pd.Series(raw_grades_list)
@@ -431,7 +473,7 @@ with tab2:
 
         st.download_button(
             label="📥 평가 집계 결과 엑셀(CSV) 다운로드",
-            data=summary_df.to_csv(index=False).encode("utf-8-sig"),
+            data=download_df.to_csv(index=False).encode("utf-8-sig"),
             file_name="PLC_Software_역량진단_결과.csv",
             mime="text/csv",
         )
@@ -508,26 +550,26 @@ with tab3:
             inplace=True,
         )
 
-        # 1. 평균 점수 및 예상 등급 계산
-        display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(2)
+        # 소수점 첫째 자리로 평균 계산
+        display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(1)
+        for item in ITEMS:
+            display_df[item] = display_df[item].round(1)
+
         display_df["_temp_est_grade"] = display_df["평균 점수"].apply(
             calculate_grade
         )
-
-        # 2. 사전 진단 등급 가져오기
         display_df["_temp_pre_grade"] = display_df["평가 대상자"].apply(
             get_pre_grade
         )
 
-        # 3. 이번 평가 예상 등급 (사전 진단 등급) 형태로 병합 표기 [예: A (S)]
-        display_df["이번 평가 예상 등급(사전)"] = (
-            display_df["_temp_est_grade"]
-            + " ("
-            + display_df["_temp_pre_grade"]
-            + ")"
+        # 등급별 각각 개별 색상 적용
+        display_df["이번 평가 예상 등급(사전)"] = display_df.apply(
+            lambda r: get_colored_grade_html(
+                r["_temp_est_grade"], r["_temp_pre_grade"]
+            ),
+            axis=1,
         )
 
-        # 4. 표에 노출할 컬럼 순서 지정 및 정돈
         column_order = (
             ["평가자", "평가 대상자", "이번 평가 예상 등급(사전)", "평균 점수"]
             + ITEMS
@@ -547,14 +589,10 @@ with tab3:
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
         )
 
-        # TAB 3 상세 조회 표에도 등급 색상 적용 (버전 안전 처리)
-        try:
-            styled_filtered_df = filtered_df.style.map(
-                style_grade_column, subset=["이번 평가 예상 등급(사전)"]
-            )
-        except AttributeError:
-            styled_filtered_df = filtered_df.style.applymap(
-                style_grade_column, subset=["이번 평가 예상 등급(사전)"]
-            )
-
-        st.dataframe(styled_filtered_df, use_container_width=True)
+        # HTML 스타일 적용 표 출력
+        html_filtered_table = filtered_df.to_html(
+            index=False, escape=False, classes="styled-table"
+        )
+        st.markdown(
+            TABLE_STYLE + html_filtered_table, unsafe_allow_html=True
+        )
