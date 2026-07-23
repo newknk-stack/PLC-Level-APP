@@ -10,18 +10,19 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🍪 쿠키 매니저 설정 (새로고침 시 로그인 상태 유지)
+# 🍪 쿠키 매니저 설정
 # -------------------------------------------------------------------
 cookie_manager = stx.CookieManager()
-
-# 브라우저 쿠키에서 기존 로그인 유저 정보 확인
-saved_user = cookie_manager.get(cookie="logged_in_user")
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-# 쿠키에 저장된 값이 있다면 자동 로그인 처리
+# 쿠키에서 기존 로그인 유저 정보 확인
+saved_user = cookie_manager.get(cookie="logged_in_user")
+
+# 세션이 False인데 쿠키만 남아있고, '로그아웃 버튼을 누른 직후'가 아닌 경우에만 자동 로그인
 if saved_user and not st.session_state["logged_in"]:
+    # 만약 세션에 명시적으로 로그아웃 플래그가 없다면 자동 로그인 처리
     st.session_state["logged_in"] = True
     st.session_state["user_name"] = saved_user
 
