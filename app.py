@@ -1,9 +1,36 @@
+import extra_streamlit_components as stx
 from google.oauth2.service_account import Credentials
 import gspread
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+# 페이지 기본 설정
+st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
+
+# -------------------------------------------------------------------
+# 🍪 쿠키 매니저 설정 (새로고침 시 로그인 유지)
+# -------------------------------------------------------------------
+
+
+@st.cache_resource(experimental_allow_widgets=True)
+def get_cookie_manager():
+    return stx.CookieManager()
+
+
+cookie_manager = get_cookie_manager()
+
+# 쿠키에서 기존 로그인 정보 가져오기
+saved_user = cookie_manager.get(cookie="logged_in_user")
+
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+# 쿠키에 사용자 이름이 저장되어 있다면 자동 로그인 상태로 전환
+if saved_user and not st.session_state["logged_in"]:
+    st.session_state["logged_in"] = True
+    st.session_state["user_name"] = saved_user
 
 # 평가 항목 및 기본 정보 정의
 ITEMS = ["S/W 분석 및 이해", "발표 자료 완성도", "발표력", "활용도", "S/W 난이도"]
@@ -38,24 +65,19 @@ TARGETS = [
     "한정훈 CL4",
 ]
 
-# 페이지 기본 설정
-st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
-
 
 # -------------------------------------------------------------------
-# 📊 [수정] Level 3 포함 2026년 상반기 역량 진단 데이터 파싱 함수
+# 📊 2026년 상반기 역량 진단 데이터 파싱 함수
 # -------------------------------------------------------------------
 @st.cache_data
 def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
     try:
         df_raw = pd.read_excel(excel_path)
         data = []
-        # 첫번째 열(역량레벨) 제외하고 인원별 열 순회
         for col in df_raw.columns[1:]:
-            grade = col.split(".")[0]  # S, A, B, C, D 등급
-            name = df_raw[col].iloc[0]  # 이름
+            grade = col.split(".")[0]
+            name = df_raw[col].iloc[0]
 
-            # Level별 건수 및 비율 파싱 (Level 0 ~ Level 3)
             l0_cnt = int(df_raw[col].iloc[1])
             l0_pct = float(df_raw[col].iloc[2]) * 100
 
@@ -65,8 +87,8 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
             l2_cnt = int(df_raw[col].iloc[5])
             l2_pct = float(df_raw[col].iloc[6]) * 100
 
-            l3_cnt = int(df_raw[col].iloc[7])  # Level 3 건수
-            l3_pct = float(df_raw[col].iloc[8]) * 100  # Level 3 비율
+            l3_cnt = int(df_raw[col].iloc[7])
+            l3_pct = float(df_raw[col].iloc[8]) * 100
 
             data.append({
                 "이름": name,
@@ -86,15 +108,11 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
         return pd.DataFrame()
 
 
-# 사전 진단 데이터 로드
 df_comp = load_competency_data()
 
 # -------------------------------------------------------------------
-# 🔐 공동 로그인 로직
+# 🔐 로그인 화면
 # -------------------------------------------------------------------
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
 if not st.session_state["logged_in"]:
     st.title("🔐 PLC S/W 역량 진단 평가 시스템")
     st.write(
@@ -112,6 +130,10 @@ if not st.session_state["logged_in"]:
             if input_pw == str(correct_pw):
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user_name
+
+                # 쿠키에 1일(86400초)간 저장
+                cookie_manager.set("logged_in_user", user_name, max_age=86400)
+
                 st.success(
                     f"반갑습니다, {user_name}님! 시스템에 접속합니다."
                 )
@@ -132,13 +154,15 @@ st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
+    # 쿠키 삭제
+    cookie_manager.delete("logged_in_user")
     st.rerun()
 
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
-# 구글 시트 연동 설정 (gspread + google.oauth2)
+# 구글 시트 연동 설정
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_gspread_client():
@@ -214,9 +238,6 @@ with tab1:
     with col2:
         target = st.selectbox("평가 대상자 선택", TARGETS)
 
-    # ---------------------------------------------------------------
-    # 📌 [수정] Level 3 포함 사전 역량 진단 참고 정보 표출
-    # ---------------------------------------------------------------
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
         match = df_comp[df_comp["이름"] == target_clean_name]
@@ -237,7 +258,6 @@ with tab1:
                 f"##### 💡 **[{target}]** 님의 사전 역량 진단 참고 현황"
             )
 
-            # 5개 컬럼으로 메트릭 확장
             m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("사전 진단 등급", grade_badge)
             m2.metric(
@@ -263,7 +283,6 @@ with tab1:
             )
 
             st.caption("역량 수준별 분포 현황")
-            # Level 3 + Level 2 상위 비중 시각화
             high_level_pct = int(t_info["L3_pct"] + t_info["L2_pct"])
             st.progress(
                 high_level_pct,
