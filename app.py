@@ -388,10 +388,16 @@ with tab2:
 
         summary_df = pd.DataFrame(summary_list)
 
-        # 색상 스타일 적용된 Dataframe 출력
-        styled_summary_df = summary_df.style.applymap(
-            style_grade_column, subset=["기술 평가 등급(사전)"]
-        )
+        # 버전에 상관없이 호환되도록 map() 및 applymap() 폴백 처리
+        try:
+            styled_summary_df = summary_df.style.map(
+                style_grade_column, subset=["기술 평가 등급(사전)"]
+            )
+        except AttributeError:
+            styled_summary_df = summary_df.style.applymap(
+                style_grade_column, subset=["기술 평가 등급(사전)"]
+            )
+
         st.dataframe(styled_summary_df, use_container_width=True)
 
         st.markdown("### 🏆 등급 현황 통계")
@@ -541,8 +547,14 @@ with tab3:
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
         )
 
-        # TAB 3 상세 조회 표에도 등급 색상 적용
-        styled_filtered_df = filtered_df.style.applymap(
-            style_grade_column, subset=["이번 평가 예상 등급(사전)"]
-        )
+        # TAB 3 상세 조회 표에도 등급 색상 적용 (버전 안전 처리)
+        try:
+            styled_filtered_df = filtered_df.style.map(
+                style_grade_column, subset=["이번 평가 예상 등급(사전)"]
+            )
+        except AttributeError:
+            styled_filtered_df = filtered_df.style.applymap(
+                style_grade_column, subset=["이번 평가 예상 등급(사전)"]
+            )
+
         st.dataframe(styled_filtered_df, use_container_width=True)
