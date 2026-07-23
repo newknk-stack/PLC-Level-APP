@@ -11,18 +11,21 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🍪 쿠키 매니저 설정 (새로고침 시 로그인 상태 유지)
+# 🍪 쿠키 매니저 및 로그인 세션 제어
 # -------------------------------------------------------------------
 cookie_manager = stx.CookieManager()
 
+# 세션 상태 초기화
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
+if "logout_triggered" not in st.session_state:
+    st.session_state["logout_triggered"] = False
 
-# 브라우저 쿠키에서 기존 로그인 유저 정보 확인
+# 브라우저 쿠키 확인
 saved_user = cookie_manager.get(cookie="logged_in_user")
 
-# 쿠키에 저장된 값이 있고 세션이 비어있다면 자동 로그인 처리
-if saved_user and not st.session_state["logged_in"]:
+# 🔥 핵심: 로그아웃을 방금 누른 게 아닐 때만 쿠키로 자동 로그인 수행
+if saved_user and not st.session_state["logged_in"] and not st.session_state["logout_triggered"]:
     st.session_state["logged_in"] = True
     st.session_state["user_name"] = saved_user
 
@@ -220,12 +223,13 @@ if not st.session_state["logged_in"]:
             if input_pw == str(correct_pw):
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user_name
+                st.session_state["logout_triggered"] = False  # ✨ 로그인 성공 시 로그아웃 플래그 초기화
 
                 # 쿠키에 1일(86400초) 간 저장
                 cookie_manager.set("logged_in_user", user_name, max_age=86400)
 
                 st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
-                time.sleep(0.5)
+                time.sleep(0.3)
                 st.rerun()
             else:
                 st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
@@ -233,17 +237,21 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # -------------------------------------------------------------------
-# 👤 사이드바 (접속자 정보 및 정상 동작 로그아웃)
+# 👤 사이드바 (로그아웃 처리)
 # -------------------------------------------------------------------
 st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
+    # 1. 세션 상태 즉시 초기화 + 로그아웃 플래그 설정 (자동 로그인 차단)
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
+    st.session_state["logout_triggered"] = True
+
+    # 2. 브라우저 쿠키 삭제
     cookie_manager.delete("logged_in_user")
-    st.sidebar.success("로그아웃 되었습니다.")
-    time.sleep(0.5)  # 쿠키 비동기 삭제 반영용 대기시간
+
+    # 3. 즉시 새로고침하여 로그인 화면으로 이동
     st.rerun()
 
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
@@ -351,8 +359,8 @@ with tab1:
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
     scores = {}
-    
-    # 20개 항목을 4개씩 5줄로 나누어 라벨 글자 겹침 방지 (그리드 배치)
+
+    # 20개 항목 4x5 배치 (라벨 글자 겹침 방지)
     items_per_row = 4
     for i in range(0, len(ITEMS), items_per_row):
         row_items = ITEMS[i : i + items_per_row]
