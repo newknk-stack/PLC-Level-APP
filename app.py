@@ -103,6 +103,50 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
 
 df_comp = load_competency_data()
 
+
+# -------------------------------------------------------------------
+# 🎨 등급별 텍스트 색상 스타일링 함수
+# -------------------------------------------------------------------
+def style_grade_column(val):
+    val_str = str(val).strip()
+    if val_str.startswith("S"):
+        color = "#8E44AD"  # 보라색
+    elif val_str.startswith("A"):
+        color = "#2980B9"  # 파란색
+    elif val_str.startswith("B"):
+        color = "#27AE60"  # 초록색
+    elif val_str.startswith("C"):
+        color = "#D35400"  # 주황/황갈색
+    elif val_str.startswith("D"):
+        color = "#C0392B"  # 빨간색
+    else:
+        color = "inherit"
+    return f"color: {color}; font-weight: bold;"
+
+
+def get_pre_grade(target_full_name):
+    if df_comp.empty:
+        return "-"
+    clean_name = str(target_full_name).split()[0]
+    m = df_comp[df_comp["이름"] == clean_name]
+    if not m.empty:
+        return m.iloc[0]["등급"]
+    return "-"
+
+
+def calculate_grade(avg_score):
+    if avg_score >= 9.0:
+        return "S"
+    elif avg_score >= 8.0:
+        return "A"
+    elif avg_score >= 7.0:
+        return "B"
+    elif avg_score >= 6.0:
+        return "C"
+    else:
+        return "D"
+
+
 # -------------------------------------------------------------------
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
@@ -194,19 +238,6 @@ def load_data():
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
 
-def calculate_grade(avg_score):
-    if avg_score >= 9.0:
-        return "S"
-    elif avg_score >= 8.0:
-        return "A"
-    elif avg_score >= 7.0:
-        return "B"
-    elif avg_score >= 6.0:
-        return "C"
-    else:
-        return "D"
-
-
 # 탭 구성
 tab1, tab2, tab3 = st.tabs([
     "📝 평가 입력",
@@ -230,7 +261,7 @@ with tab1:
     with col2:
         target = st.selectbox("평가 대상자 선택", TARGETS)
 
-    # 사전 역량 진단 참고 정보 표출 (Level 3 포함 5개 Metric)
+    # 사전 역량 진단 참고 정보 표출
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
         match = df_comp[df_comp["이름"] == target_clean_name]
@@ -330,18 +361,26 @@ with tab2:
             df[item] = pd.to_numeric(df[item], errors="coerce").fillna(0)
 
         summary_list = []
+        raw_grades_list = []  # 통계 계산용 순수 등급 저장
+
         for target_person in df["target"].unique():
             sub_df = df[df["target"] == target_person]
             eval_count = len(sub_df)
             item_means = sub_df[ITEMS].mean()
             total_avg = item_means.mean()
-            grade = calculate_grade(total_avg)
+
+            est_grade = calculate_grade(total_avg)
+            pre_grade = get_pre_grade(target_person)
+            raw_grades_list.append(est_grade)
+
+            # 등급(사전) 문자열 조합 (예: A (S))
+            combined_grade = f"{est_grade} ({pre_grade})"
 
             row = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_avg, 2),
-                "기술 평가 등급": grade,
+                "기술 평가 등급(사전)": combined_grade,
             }
             for item in ITEMS:
                 row[item] = round(item_means[item], 2)
@@ -349,13 +388,16 @@ with tab2:
 
         summary_df = pd.DataFrame(summary_list)
 
-        st.dataframe(summary_df, use_container_width=True)
+        # 색상 스타일 적용된 Dataframe 출력
+        styled_summary_df = summary_df.style.applymap(
+            style_grade_column, subset=["기술 평가 등급(사전)"]
+        )
+        st.dataframe(styled_summary_df, use_container_width=True)
 
         st.markdown("### 🏆 등급 현황 통계")
-        grade_counts = (
-            summary_df["기술 평가 등급"]
-            .value_counts()
-            .reindex(["S", "A", "B", "C", "D"], fill_value=0)
+        grade_series = pd.Series(raw_grades_list)
+        grade_counts = grade_series.value_counts().reindex(
+            ["S", "A", "B", "C", "D"], fill_value=0
         )
 
         c1, c2, c3, c4, c5 = st.columns(5)
@@ -466,16 +508,7 @@ with tab3:
             calculate_grade
         )
 
-        # 2. 사전 진단 등급 매핑 함수
-        def get_pre_grade(target_full_name):
-            if df_comp.empty:
-                return "-"
-            clean_name = str(target_full_name).split()[0]
-            m = df_comp[df_comp["이름"] == clean_name]
-            if not m.empty:
-                return m.iloc[0]["등급"]
-            return "-"
-
+        # 2. 사전 진단 등급 가져오기
         display_df["_temp_pre_grade"] = display_df["평가 대상자"].apply(
             get_pre_grade
         )
@@ -507,4 +540,9 @@ with tab3:
         st.markdown(
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
         )
-        st.dataframe(filtered_df, use_container_width=True)
+
+        # TAB 3 상세 조회 표에도 등급 색상 적용
+        styled_filtered_df = filtered_df.style.applymap(
+            style_grade_column, subset=["이번 평가 예상 등급(사전)"]
+        )
+        st.dataframe(styled_filtered_df, use_container_width=True)
