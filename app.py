@@ -105,7 +105,7 @@ df_comp = load_competency_data()
 
 
 # -------------------------------------------------------------------
-# 🎨 등급별 개별 HTML 색상 생성 함수 (괄호 안의 등급도 각각의 색상 적용)
+# 🎨 등급별 개별 HTML 색상 생성 함수 (사전등급 → 평가등급)
 # -------------------------------------------------------------------
 def get_colored_grade_html(est_grade, pre_grade):
     color_map = {
@@ -119,7 +119,8 @@ def get_colored_grade_html(est_grade, pre_grade):
     c_est = color_map.get(str(est_grade).strip()[0:1], "#333333")
     c_pre = color_map.get(str(pre_grade).strip()[0:1], "#333333")
 
-    html_str = f'<span style="color: {c_est}; font-weight: bold;">{est_grade}</span> (<span style="color: {c_pre}; font-weight: bold;">{pre_grade}</span>)'
+    # 사전등급 → 평가등급
+    html_str = f'<span style="color: {c_pre}; font-weight: bold;">{pre_grade}</span> → <span style="color: {c_est}; font-weight: bold;">{est_grade}</span>'
     return html_str
 
 
@@ -407,22 +408,22 @@ with tab2:
             pre_grade = get_pre_grade(target_person)
             raw_grades_list.append(est_grade)
 
-            # 각각 등급에 맞는 개별 색상 HTML 적용
+            # 사전등급 → 평가등급 (각각 개별 색상 적용)
             colored_grade_html = get_colored_grade_html(est_grade, pre_grade)
 
-            # 화면 출력용 (소수점 첫째 자리 반영)
+            # 화면 출력용
             row = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_avg, 1),
-                "기술 평가 등급(사전)": colored_grade_html,
+                "기술 등급 (사전 → 평가)": colored_grade_html,
             }
             # 엑셀/CSV 다운로드용 (순수 텍스트)
             row_dl = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_avg, 1),
-                "기술 평가 등급(사전)": f"{est_grade} ({pre_grade})",
+                "기술 등급 (사전 → 평가)": f"{pre_grade} → {est_grade}",
             }
 
             for item in ITEMS:
@@ -562,8 +563,8 @@ with tab3:
             get_pre_grade
         )
 
-        # 등급별 각각 개별 색상 적용
-        display_df["이번 평가 예상 등급(사전)"] = display_df.apply(
+        # 사전등급 → 평가등급 (각각 개별 색상 적용)
+        display_df["기술 등급 (사전 → 평가)"] = display_df.apply(
             lambda r: get_colored_grade_html(
                 r["_temp_est_grade"], r["_temp_pre_grade"]
             ),
@@ -571,7 +572,7 @@ with tab3:
         )
 
         column_order = (
-            ["평가자", "평가 대상자", "이번 평가 예상 등급(사전)", "평균 점수"]
+            ["평가자", "평가 대상자", "기술 등급 (사전 → 평가)", "평균 점수"]
             + ITEMS
         )
         display_df = display_df[column_order]
