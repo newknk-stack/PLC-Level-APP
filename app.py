@@ -16,6 +16,47 @@ TARGETS = [
 
 # 페이지 기본 설정
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
+
+# -------------------------------------------------------------------
+# 🔐 공동 로그인 로직
+# -------------------------------------------------------------------
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+if not st.session_state["logged_in"]:
+    st.title("🔐 PLC S/W 역량 진단 평가 시스템")
+    st.write("시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요.")
+
+    with st.form("login_form"):
+        user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
+        input_pw = st.text_input("🔑 공동 비밀번호 입력", type="password")
+        submit = st.form_submit_button("로그인")
+
+        if submit:
+            # Secrets에서 공동 비밀번호 가져오기
+            correct_pw = st.secrets.get("common_password", "1234")  # 기본값 1234
+            
+            if input_pw == str(correct_pw):
+                st.session_state["logged_in"] = True
+                st.session_state["user_name"] = user_name
+                st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
+                st.rerun()
+            else:
+                st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
+
+    st.stop()  # 로그인되지 않은 경우 아래 코드를 실행하지 않음
+
+# -------------------------------------------------------------------
+# 👤 사이드바 (접속자 정보 및 로그아웃)
+# -------------------------------------------------------------------
+st.sidebar.markdown(f"### 👤 **접속자 정보**")
+st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
+
+if st.sidebar.button("🚪 로그아웃", type="secondary"):
+    st.session_state["logged_in"] = False
+    st.session_state["user_name"] = None
+    st.rerun()
+
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 # -------------------------------------------------------------------
@@ -81,9 +122,12 @@ tab1, tab2, tab3 = st.tabs([
 with tab1:
     st.subheader("평가 점수 제출")
 
+    # 로그인한 사용자 이름으로 평가자 자동 고정
+    evaluator = st.session_state["user_name"]
+
     col1, col2 = st.columns(2)
     with col1:
-        evaluator = st.selectbox("평가자 선택", EVALUATORS)
+        st.text_input("평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True)
     with col2:
         target = st.selectbox("평가 대상자 선택", TARGETS)
 
@@ -113,7 +157,7 @@ with tab1:
             sheet.clear()
             sheet.update([df.columns.values.tolist()] + df.values.tolist())
             
-            st.success(f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 구글 시트에 저장되었습니다!")
+            st.success(f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 성공적으로 저장되었습니다!")
         except Exception as e:
             st.error(f"저장 중 오류가 발생했습니다: {e}")
 
@@ -192,8 +236,11 @@ with tab3:
     evaluator_list = ["전체"] + EVALUATORS
     target_list = ["전체"] + TARGETS
 
+    # 기본적으로 로그인한 사용자가 기본 선택되도록 설정
+    default_eval_idx = evaluator_list.index(st.session_state["user_name"]) if st.session_state["user_name"] in evaluator_list else 0
+
     with filter_col1:
-        sel_evaluator = st.selectbox("👤 평가자 필터", evaluator_list)
+        sel_evaluator = st.selectbox("👤 평가자 필터", evaluator_list, index=default_eval_idx)
     with filter_col2:
         sel_target = st.selectbox("🎯 평가 대상자 필터", target_list)
 
@@ -209,7 +256,6 @@ with tab3:
         
         if not_evaluated_targets:
             with st.expander(f"⚠️ [{sel_evaluator}] 평가자가 아직 평가하지 않은 대상자 목록 ({len(not_evaluated_targets)}명)", expanded=True):
-                # 보기 좋게 여러 열로 나열
                 cols_per_row = 4
                 for i in range(0, len(not_evaluated_targets), cols_per_row):
                     cols = st.columns(cols_per_row)
