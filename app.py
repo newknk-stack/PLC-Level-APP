@@ -244,12 +244,16 @@ st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
+    # 1. 세션 상태 즉시 초기화
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
+    
+    # 2. 쿠키 삭제
     cookie_manager.delete("logged_in_user")
+    
+    st.sidebar.success("로그아웃 되었습니다.")
+    # 3. 쿠키가 브라우저에서 완전히 삭제될 수 있도록 재실행
     st.rerun()
-
-st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
