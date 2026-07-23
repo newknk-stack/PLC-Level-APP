@@ -34,7 +34,7 @@ if not st.session_state["logged_in"]:
 
         if submit:
             # Secrets에서 공동 비밀번호 가져오기
-            correct_pw = st.secrets.get("common_password", "1234")  # 기본값 1234
+            correct_pw = st.secrets.get("common_password", "2026")  # 기본값 1234
             
             if input_pw == str(correct_pw):
                 st.session_state["logged_in"] = True
