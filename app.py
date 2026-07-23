@@ -1,9 +1,7 @@
-import json
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from streamlit_gsheets import GSheetsConnection
 
 # 평가 항목 및 기본 정보 정의
 ITEMS = ["S/W 분석 및 이해", "발표 자료 완성도", "발표력", "활용도", "S/W 난이도"]
@@ -20,33 +18,15 @@ st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 # -------------------------------------------------------------------
-# 구글 시트 연동 설정 (gspread)
+# 구글 시트 연동 설정 (st-gsheets-connection)
 # -------------------------------------------------------------------
-@st.cache_resource
-def get_gspread_client():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    # Secrets에 저장된 서비스 계정 정보 불러오기
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    return client
-
-def get_worksheet():
-    client = get_gspread_client()
-    # Secrets에 입력된 구글 시트 URL 또는 이름으로 연결
-    sheet_url = st.secrets["private_gsheets_url"]
-    sheet = client.open_by_url(sheet_url).sheet1
-    return sheet
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 데이터 불러오기 함수
 def load_data():
     try:
-        sheet = get_worksheet()
-        records = sheet.get_all_records()
-        df = pd.DataFrame(records)
+        # ttl=0 설정으로 시트 데이터를 실시간으로 읽어옵니다.
+        df = conn.read(ttl=0)
         if df.empty:
             df = pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
         return df
@@ -108,10 +88,8 @@ with tab1:
             else:
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-            # 구글 시트에 업데이트 저장 (헤더 포함 전체 데이터 쓰기)
-            sheet = get_worksheet()
-            sheet.clear()
-            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+            # 구글 시트 업데이트
+            conn.update(data=df)
             
             st.success(f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 구글 시트에 저장되었습니다!")
         except Exception as e:
