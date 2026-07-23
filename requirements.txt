@@ -1,7 +1,5 @@
 streamlit
 pandas
 plotly
-gspread
-google-auth
 st-filesconnection
 st-gsheets-connection
