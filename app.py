@@ -43,7 +43,7 @@ st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 
 # -------------------------------------------------------------------
-# 📊 [신규] 2026년 상반기 역량 진단 데이터 파싱 함수
+# 📊 [수정] Level 3 포함 2026년 상반기 역량 진단 데이터 파싱 함수
 # -------------------------------------------------------------------
 @st.cache_data
 def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
@@ -55,7 +55,7 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
             grade = col.split(".")[0]  # S, A, B, C, D 등급
             name = df_raw[col].iloc[0]  # 이름
 
-            # Level별 건수 및 비율 파싱
+            # Level별 건수 및 비율 파싱 (Level 0 ~ Level 3)
             l0_cnt = int(df_raw[col].iloc[1])
             l0_pct = float(df_raw[col].iloc[2]) * 100
 
@@ -64,6 +64,9 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
 
             l2_cnt = int(df_raw[col].iloc[5])
             l2_pct = float(df_raw[col].iloc[6]) * 100
+
+            l3_cnt = int(df_raw[col].iloc[7])  # Level 3 건수
+            l3_pct = float(df_raw[col].iloc[8]) * 100  # Level 3 비율
 
             data.append({
                 "이름": name,
@@ -74,6 +77,8 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
                 "L1_pct": round(l1_pct, 1),
                 "L2_cnt": l2_cnt,
                 "L2_pct": round(l2_pct, 1),
+                "L3_cnt": l3_cnt,
+                "L3_pct": round(l3_pct, 1),
             })
         return pd.DataFrame(data)
     except Exception as e:
@@ -210,10 +215,9 @@ with tab1:
         target = st.selectbox("평가 대상자 선택", TARGETS)
 
     # ---------------------------------------------------------------
-    # 📌 [신규 반영] 선택된 대상자의 사전 역량 진단 참고 정보표출
+    # 📌 [수정] Level 3 포함 사전 역량 진단 참고 정보 표출
     # ---------------------------------------------------------------
     if target and not df_comp.empty:
-        # '박상규 CL4' -> '박상규' 이름만 분리
         target_clean_name = target.split()[0]
         match = df_comp[df_comp["이름"] == target_clean_name]
 
@@ -221,7 +225,6 @@ with tab1:
             t_info = match.iloc[0]
             st.markdown("---")
 
-            # 등급 배지 표기 스타일
             grade_badge = {
                 "S": "🟣 S등급 (최우수)",
                 "A": "🔵 A등급 (우수)",
@@ -234,29 +237,37 @@ with tab1:
                 f"##### 💡 **[{target}]** 님의 사전 역량 진단 참고 현황"
             )
 
-            m1, m2, m3, m4 = st.columns(4)
+            # 5개 컬럼으로 메트릭 확장
+            m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("사전 진단 등급", grade_badge)
             m2.metric(
+                "Level 3 (전문가)",
+                f"{t_info['L3_cnt']}건",
+                f"{t_info['L3_pct']}%",
+            )
+            m3.metric(
                 "Level 2 (우수/숙련)",
                 f"{t_info['L2_cnt']}건",
                 f"{t_info['L2_pct']}%",
             )
-            m3.metric(
+            m4.metric(
                 "Level 1 (보통/실무)",
                 f"{t_info['L1_cnt']}건",
                 f"{t_info['L1_pct']}%",
             )
-            m4.metric(
+            m5.metric(
                 "Level 0 (기초/미흡)",
                 f"{t_info['L0_cnt']}건",
                 f"{t_info['L0_pct']}%",
                 delta_color="inverse",
             )
 
-            st.caption("역량 수준별 분포 (Level 2 비중)")
+            st.caption("역량 수준별 분포 현황")
+            # Level 3 + Level 2 상위 비중 시각화
+            high_level_pct = int(t_info["L3_pct"] + t_info["L2_pct"])
             st.progress(
-                int(t_info["L2_pct"]),
-                text=f"Level 2: {t_info['L2_pct']}% | Level 1: {t_info['L1_pct']}% | Level 0: {t_info['L0_pct']}%",
+                high_level_pct,
+                text=f"L3(전문): {t_info['L3_pct']}% | L2(우수): {t_info['L2_pct']}% | L1(실무): {t_info['L1_pct']}% | L0(기초): {t_info['L0_pct']}%",
             )
 
     st.markdown("---")
