@@ -147,7 +147,6 @@ st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
-    # 쿠키 삭제
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
@@ -389,7 +388,7 @@ with tab2:
         )
 
 # -------------------------------------------------------------------
-# TAB 3: 평가자별 / 대상자별 상세 조회
+# TAB 3: [수정] 평가자별 / 대상자별 상세 조회
 # -------------------------------------------------------------------
 with tab3:
     st.subheader("🔍 개별 평가 내역 상세 조회")
@@ -459,8 +458,43 @@ with tab3:
             columns={"evaluator": "평가자", "target": "평가 대상자"},
             inplace=True,
         )
+
+        # 1. 평균 점수 계산
         display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(2)
 
+        # 2. 이번 평가 예상 등급 부여
+        display_df["이번 평가 예상 등급"] = display_df["평균 점수"].apply(
+            calculate_grade
+        )
+
+        # 3. 사전 진단 등급 매핑 함수
+        def get_pre_grade(target_full_name):
+            if df_comp.empty:
+                return "-"
+            clean_name = str(target_full_name).split()[0]
+            m = df_comp[df_comp["이름"] == clean_name]
+            if not m.empty:
+                return m.iloc[0]["등급"]
+            return "-"
+
+        display_df["사전 진단 등급"] = display_df["평가 대상자"].apply(
+            get_pre_grade
+        )
+
+        # 4. 컬럼 순서 재배치 (사전 진단 등급 & 예상 등급 전면 배치)
+        column_order = (
+            [
+                "평가자",
+                "평가 대상자",
+                "사전 진단 등급",
+                "이번 평가 예상 등급",
+                "평균 점수",
+            ]
+            + ITEMS
+        )
+        display_df = display_df[column_order]
+
+        # 필터링 적용
         filtered_df = display_df.copy()
 
         if sel_evaluator != "전체":
