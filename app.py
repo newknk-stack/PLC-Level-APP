@@ -10,22 +10,22 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🍪 쿠키 매니저 설정 (새로고침 시 로그인 유지)
+# 🍪 쿠키 매니저 설정 (새로고침 시 로그인 상태 유지)
 # -------------------------------------------------------------------
 cookie_manager = stx.CookieManager()
 
-# 쿠키에서 기존 로그인 정보 가져오기
+# 브라우저 쿠키에서 기존 로그인 유저 정보 확인
 saved_user = cookie_manager.get(cookie="logged_in_user")
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-# 쿠키에 사용자 이름이 저장되어 있다면 자동 로그인 상태로 전환
+# 쿠키에 저장된 값이 있다면 자동 로그인 처리
 if saved_user and not st.session_state["logged_in"]:
     st.session_state["logged_in"] = True
     st.session_state["user_name"] = saved_user
 
-# 평가 항목 및 기본 정보 정의
+# 평가 항목 및 평가자/대상자 기본 정의
 ITEMS = ["S/W 분석 및 이해", "발표 자료 완성도", "발표력", "활용도", "S/W 난이도"]
 EVALUATORS = ["정준영", "차영진", "김태환", "김남권", "최치웅"]
 TARGETS = [
@@ -60,7 +60,7 @@ TARGETS = [
 
 
 # -------------------------------------------------------------------
-# 📊 2026년 상반기 역량 진단 데이터 파싱 함수
+# 📊 2026년 상반기 역량 진단 데이터 파싱 함수 (Level 0 ~ Level 3 포함)
 # -------------------------------------------------------------------
 @st.cache_data
 def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
@@ -124,7 +124,7 @@ if not st.session_state["logged_in"]:
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user_name
 
-                # 쿠키에 1일(86400초)간 저장
+                # 쿠키에 1일(86400초) 간 저장
                 cookie_manager.set("logged_in_user", user_name, max_age=86400)
 
                 st.success(
@@ -154,7 +154,7 @@ st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
-# 구글 시트 연동 설정
+# ☁️ 구글 시트 연동 설정
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_gspread_client():
@@ -230,6 +230,7 @@ with tab1:
     with col2:
         target = st.selectbox("평가 대상자 선택", TARGETS)
 
+    # 사전 역량 진단 참고 정보 표출 (Level 3 포함 5개 Metric)
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
         match = df_comp[df_comp["이름"] == target_clean_name]
@@ -388,7 +389,7 @@ with tab2:
         )
 
 # -------------------------------------------------------------------
-# TAB 3: [수정] 평가자별 / 대상자별 상세 조회
+# TAB 3: 평가자별 / 대상자별 상세 조회
 # -------------------------------------------------------------------
 with tab3:
     st.subheader("🔍 개별 평가 내역 상세 조회")
@@ -459,15 +460,13 @@ with tab3:
             inplace=True,
         )
 
-        # 1. 평균 점수 계산
+        # 1. 평균 점수 및 예상 등급 계산
         display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(2)
-
-        # 2. 이번 평가 예상 등급 부여
-        display_df["이번 평가 예상 등급"] = display_df["평균 점수"].apply(
+        display_df["_temp_est_grade"] = display_df["평균 점수"].apply(
             calculate_grade
         )
 
-        # 3. 사전 진단 등급 매핑 함수
+        # 2. 사전 진단 등급 매핑 함수
         def get_pre_grade(target_full_name):
             if df_comp.empty:
                 return "-"
@@ -477,19 +476,21 @@ with tab3:
                 return m.iloc[0]["등급"]
             return "-"
 
-        display_df["사전 진단 등급"] = display_df["평가 대상자"].apply(
+        display_df["_temp_pre_grade"] = display_df["평가 대상자"].apply(
             get_pre_grade
         )
 
-        # 4. 컬럼 순서 재배치 (사전 진단 등급 & 예상 등급 전면 배치)
+        # 3. 이번 평가 예상 등급 (사전 진단 등급) 형태로 병합 표기 [예: A (S)]
+        display_df["이번 평가 예상 등급(사전)"] = (
+            display_df["_temp_est_grade"]
+            + " ("
+            + display_df["_temp_pre_grade"]
+            + ")"
+        )
+
+        # 4. 표에 노출할 컬럼 순서 지정 및 정돈
         column_order = (
-            [
-                "평가자",
-                "평가 대상자",
-                "사전 진단 등급",
-                "이번 평가 예상 등급",
-                "평균 점수",
-            ]
+            ["평가자", "평가 대상자", "이번 평가 예상 등급(사전)", "평균 점수"]
             + ITEMS
         )
         display_df = display_df[column_order]
