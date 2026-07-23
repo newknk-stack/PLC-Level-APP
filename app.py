@@ -12,9 +12,7 @@ st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 # -------------------------------------------------------------------
 # 🍪 쿠키 매니저 설정 (새로고침 시 로그인 유지)
 # -------------------------------------------------------------------
-
-
-@st.cache_resource(experimental_allow_widgets=True)
+@st.cache_resource
 def get_cookie_manager():
     return stx.CookieManager()
 
