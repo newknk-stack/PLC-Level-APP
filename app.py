@@ -12,12 +12,7 @@ st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 # -------------------------------------------------------------------
 # 🍪 쿠키 매니저 설정 (새로고침 시 로그인 유지)
 # -------------------------------------------------------------------
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager()
-
-
-cookie_manager = get_cookie_manager()
+cookie_manager = stx.CookieManager()
 
 # 쿠키에서 기존 로그인 정보 가져오기
 saved_user = cookie_manager.get(cookie="logged_in_user")
