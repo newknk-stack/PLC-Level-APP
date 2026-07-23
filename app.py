@@ -7,117 +7,7 @@ import plotly.express as px
 import streamlit as st
 
 # 페이지 기본 설정
-st.set_page_config(
-    page_title="PLC S/W 역량 진단 평가 툴",
-    page_icon="⚡",
-    layout="wide",
-)
-
-# -------------------------------------------------------------------
-# 🎨 Modern & Clean CSS Custom Styling (기존 구조 보존 스타일)
-# -------------------------------------------------------------------
-CUSTOM_STYLE = """
-<style>
-    /* 메인 앱 배경 및 기본 폰트 설정 */
-    .stApp {
-        background-color: #f8fafc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-
-    /* 메인 타이틀 영역 스타일링 */
-    .app-header {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        padding: 22px 28px;
-        border-radius: 12px;
-        color: #ffffff;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-    }
-    .app-header h1 {
-        color: #ffffff !important;
-        font-size: 1.6rem !important;
-        font-weight: 700 !important;
-        margin: 0 !important;
-    }
-    .app-header p {
-        color: #94a3b8;
-        font-size: 0.9rem;
-        margin: 4px 0 0 0;
-    }
-
-    /* 슬라이더 간격 및 디자인 정돈 */
-    .stSlider {
-        padding-top: 6px;
-        padding-bottom: 6px;
-    }
-
-    /* 메트릭 카드 입체감 부여 */
-    div[data-testid="stMetric"] {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 14px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-    div[data-testid="stMetricLabel"] {
-        color: #64748b !important;
-        font-weight: 600 !important;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #0f172a !important;
-        font-weight: 700 !important;
-    }
-
-    /* 고급 HTML 세련된 테이블 스타일 */
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 15px 0;
-        font-size: 0.92rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        border-radius: 8px;
-        overflow: hidden;
-        border: 1px solid #e2e8f0;
-    }
-    .styled-table thead tr {
-        background-color: #1e293b;
-        color: #f8fafc;
-        text-align: center;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-    }
-    .styled-table th, .styled-table td {
-        padding: 12px 14px;
-        text-align: center;
-        border-bottom: 1px solid #edf2f7;
-    }
-    .styled-table tbody tr {
-        background-color: #ffffff;
-    }
-    .styled-table tbody tr:nth-of-type(even) {
-        background-color: #f8fafc;
-    }
-    .styled-table tbody tr:hover {
-        background-color: #f1f5f9;
-    }
-
-    /* 세련된 등급 뱃지 스타일 */
-    .gb {
-        display: inline-block;
-        padding: 3px 9px;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 0.88rem;
-    }
-    .gb-S { background-color: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
-    .gb-A { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .gb-B { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-    .gb-C { background-color: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
-    .gb-D { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-    .gb-none { background-color: #f1f5f9; color: #64748b; }
-</style>
-"""
-st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
+st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
 # 🍪 쿠키 매니저 설정 (새로고침 시 로그인 상태 유지)
@@ -215,17 +105,22 @@ df_comp = load_competency_data()
 
 
 # -------------------------------------------------------------------
-# 🎨 등급별 세련된 HTML 뱃지 스타일 적용 [평가등급 (사전등급)]
+# 🎨 등급별 개별 HTML 색상 생성 함수 [평가등급 (사전등급)]
 # -------------------------------------------------------------------
 def get_colored_grade_html(est_grade, pre_grade):
-    g_est = str(est_grade).strip()[0:1]
-    g_pre = str(pre_grade).strip()[0:1]
+    color_map = {
+        "S": "#8E44AD",  # 보라색
+        "A": "#2980B9",  # 파란색
+        "B": "#27AE60",  # 초록색
+        "C": "#D35400",  # 주황색
+        "D": "#C0392B",  # 빨간색
+    }
 
-    cls_est = f"gb-{g_est}" if g_est in ["S", "A", "B", "C", "D"] else "gb-none"
-    cls_pre = f"gb-{g_pre}" if g_pre in ["S", "A", "B", "C", "D"] else "gb-none"
+    c_est = color_map.get(str(est_grade).strip()[0:1], "#333333")
+    c_pre = color_map.get(str(pre_grade).strip()[0:1], "#333333")
 
-    # 세련된 라운드 뱃지 형태 적용
-    html_str = f'<span class="gb {cls_est}">{est_grade}</span> <span style="color:#94a3b8;">(</span><span class="gb {cls_pre}">{pre_grade}</span><span style="color:#94a3b8;">)</span>'
+    # 평가등급 (사전등급)
+    html_str = f'<span style="color: {c_est}; font-weight: bold;">{est_grade}</span> (<span style="color: {c_pre}; font-weight: bold;">{pre_grade}</span>)'
     return html_str
 
 
@@ -252,45 +147,72 @@ def calculate_grade(avg_score):
         return "D"
 
 
+# HTML 테이블 렌더링용 스타일
+TABLE_STYLE = """
+<style>
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        font-size: 0.95rem;
+        font-family: sans-serif;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .styled-table thead tr {
+        background-color: #0E1117;
+        color: #ffffff;
+        text-align: center;
+        font-weight: bold;
+    }
+    .styled-table th, .styled-table td {
+        padding: 10px 12px;
+        text-align: center;
+        border-bottom: 1px solid #dddddd;
+    }
+    .styled-table tbody tr:nth-of-type(even) {
+        background-color: #f8f9fa;
+    }
+    .styled-table tbody tr:hover {
+        background-color: #f1f3f5;
+    }
+</style>
+"""
+
+
 # -------------------------------------------------------------------
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
-    st.markdown(
-        """
-        <div class="app-header" style="text-align: center; padding: 30px;">
-            <h1>🔐 PLC S/W 역량 진단 평가 시스템</h1>
-            <p>시스템 접속을 위해 평가자 본인 선택 및 비밀번호를 입력해주세요.</p>
-        </div>
-    """,
-        unsafe_allow_html=True,
+    st.title("🔐 PLC S/W 역량 진단 평가 시스템")
+    st.write(
+        "시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요."
     )
 
-    c1, c2, c3 = st.columns([1, 1.2, 1])
-    with c2:
-        with st.form("login_form"):
-            user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
-            input_pw = st.text_input("🔑 공동 비밀번호 입력", type="password")
-            submit = st.form_submit_button(
-                "로그인", use_container_width=True, type="primary"
-            )
+    with st.form("login_form"):
+        user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
+        input_pw = st.text_input("🔑 공동 비밀번호 입력", type="password")
+        submit = st.form_submit_button("로그인")
 
-            if submit:
-                correct_pw = st.secrets.get("common_password", "2026")
+        if submit:
+            correct_pw = st.secrets.get("common_password", "2026")
 
-                if input_pw == str(correct_pw):
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_name"] = user_name
+            if input_pw == str(correct_pw):
+                st.session_state["logged_in"] = True
+                st.session_state["user_name"] = user_name
 
-                    # 쿠키에 1일(86400초) 간 저장
-                    cookie_manager.set(
-                        "logged_in_user", user_name, max_age=86400
-                    )
+                # 쿠키에 1일(86400초) 간 저장
+                cookie_manager.set("logged_in_user", user_name, max_age=86400)
 
-                    st.success(f"반갑습니다, {user_name}님!")
-                    st.rerun()
-                else:
-                    st.error("비밀번호가 올바르지 않습니다.")
+                st.success(
+                    f"반갑습니다, {user_name}님! 시스템에 접속합니다."
+                )
+                st.rerun()
+            else:
+                st.error(
+                    "비밀번호가 올바르지 않습니다. 다시 확인해 주세요."
+                )
 
     st.stop()
 
@@ -300,24 +222,13 @@ if not st.session_state["logged_in"]:
 st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 
-if st.sidebar.button(
-    "🚪 로그아웃", type="secondary", use_container_width=True
-):
+if st.sidebar.button("🚪 로그아웃", type="secondary"):
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
-# 상단 대시보드 헤더
-st.markdown(
-    """
-    <div class="app-header">
-        <h1>⚡ PLC S/W 역량 진단 평가 시스템</h1>
-        <p>공정하고 정확한 역량 진단 및 피드백을 위한 평가 플랫폼입니다.</p>
-    </div>
-""",
-    unsafe_allow_html=True,
-)
+st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
@@ -445,8 +356,7 @@ with tab1:
         with cols[i]:
             scores[item] = st.slider(f"{item}", 0, 10, 5, key=f"slide_{item}")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("점수 저장 및 제출", type="primary", use_container_width=True):
+    if st.button("점수 저장 및 제출", type="primary"):
         try:
             df = load_data()
 
@@ -485,8 +395,8 @@ with tab2:
             df[item] = pd.to_numeric(df[item], errors="coerce").fillna(0)
 
         summary_list = []
-        raw_grades_list = []
-        download_list = []
+        raw_grades_list = []  # 통계 계산용 순수 등급 저장
+        download_list = []  # CSV 다운로드용 순수 텍스트 저장
 
         for target_person in df["target"].unique():
             sub_df = df[df["target"] == target_person]
@@ -498,14 +408,17 @@ with tab2:
             pre_grade = get_pre_grade(target_person)
             raw_grades_list.append(est_grade)
 
+            # 각각 등급에 맞는 개별 색상 HTML 적용
             colored_grade_html = get_colored_grade_html(est_grade, pre_grade)
 
+            # 화면 출력용 (소수점 첫째 자리 반영)
             row = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_avg, 1),
                 "기술 평가 등급(사전)": colored_grade_html,
             }
+            # 엑셀/CSV 다운로드용 (순수 텍스트)
             row_dl = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
@@ -528,9 +441,8 @@ with tab2:
         html_table = summary_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
-        st.markdown(html_table, unsafe_allow_html=True)
+        st.markdown(TABLE_STYLE + html_table, unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### 🏆 등급 현황 통계")
         grade_series = pd.Series(raw_grades_list)
         grade_counts = grade_series.value_counts().reindex(
@@ -541,7 +453,6 @@ with tab2:
         for i, g in enumerate(["S", "A", "B", "C", "D"]):
             eval(f"c{i+1}").metric(f"{g} 등급", f"{grade_counts[g]} 명")
 
-        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### 📈 피평가자별 역량 방사형 차트")
         selected_target = st.selectbox(
             "분석할 대상자 선택", summary_df["피평가자"].unique()
@@ -558,18 +469,7 @@ with tab2:
         fig = px.line_polar(
             radar_df, r="점수", theta="항목", line_close=True, range_r=[0, 10]
         )
-        fig.update_traces(
-            fill="toself",
-            fillcolor="rgba(30, 58, 138, 0.2)",
-            line_color="#1e3a8a",
-        )
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 10], gridcolor="#cbd5e1")
-            ),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-        )
+        fig.update_traces(fill="toself")
         st.plotly_chart(fig, use_container_width=True)
 
         st.download_button(
@@ -651,6 +551,7 @@ with tab3:
             inplace=True,
         )
 
+        # 소수점 첫째 자리로 평균 계산
         display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(1)
         for item in ITEMS:
             display_df[item] = display_df[item].round(1)
@@ -662,6 +563,7 @@ with tab3:
             get_pre_grade
         )
 
+        # 등급별 각각 개별 색상 적용
         display_df["기술 평가 등급(사전)"] = display_df.apply(
             lambda r: get_colored_grade_html(
                 r["_temp_est_grade"], r["_temp_pre_grade"]
@@ -675,6 +577,7 @@ with tab3:
         )
         display_df = display_df[column_order]
 
+        # 필터링 적용
         filtered_df = display_df.copy()
 
         if sel_evaluator != "전체":
@@ -687,7 +590,10 @@ with tab3:
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
         )
 
+        # HTML 스타일 적용 표 출력
         html_filtered_table = filtered_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
-        st.markdown(html_filtered_table, unsafe_allow_html=True)
+        st.markdown(
+            TABLE_STYLE + html_filtered_table, unsafe_allow_html=True
+        )
