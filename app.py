@@ -27,10 +27,8 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    # Secrets의 gcp_service_account 사전을 가져옵니다.
     creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # private_key의 \n 개행 처리 보완
     if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
@@ -111,7 +109,6 @@ with tab1:
             else:
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-            # 구글 시트에 업데이트 저장 (전체 덮어쓰기)
             sheet = get_worksheet()
             sheet.clear()
             sheet.update([df.columns.values.tolist()] + df.values.tolist())
@@ -190,6 +187,39 @@ with tab3:
     st.subheader("🔍 개별 평가 내역 상세 조회")
     df = load_data()
 
+    filter_col1, filter_col2 = st.columns(2)
+
+    evaluator_list = ["전체"] + EVALUATORS
+    target_list = ["전체"] + TARGETS
+
+    with filter_col1:
+        sel_evaluator = st.selectbox("👤 평가자 필터", evaluator_list)
+    with filter_col2:
+        sel_target = st.selectbox("🎯 평가 대상자 필터", target_list)
+
+    # 📌 특정 평가자를 선택한 경우: 미평가 대상자 현황 표시
+    if sel_evaluator != "전체":
+        evaluated_targets = df[df["evaluator"] == sel_evaluator]["target"].tolist() if not df.empty else []
+        not_evaluated_targets = [t for t in TARGETS if t not in evaluated_targets]
+        
+        st.markdown("---")
+        m_col1, m_col2 = st.columns(2)
+        m_col1.metric("진행한 평가 건수", f"{len(evaluated_targets)} / {len(TARGETS)} 명")
+        m_col2.metric("남은 미평가 인원", f"{len(not_evaluated_targets)} 명")
+        
+        if not_evaluated_targets:
+            with st.expander(f"⚠️ [{sel_evaluator}] 평가자가 아직 평가하지 않은 대상자 목록 ({len(not_evaluated_targets)}명)", expanded=True):
+                # 보기 좋게 여러 열로 나열
+                cols_per_row = 4
+                for i in range(0, len(not_evaluated_targets), cols_per_row):
+                    cols = st.columns(cols_per_row)
+                    for j, target_name in enumerate(not_evaluated_targets[i:i+cols_per_row]):
+                        cols[j].write(f"• {target_name}")
+        else:
+            st.success(f"🎉 [{sel_evaluator}] 평가자는 모든 대상자에 대한 평가를 완료했습니다!")
+        st.markdown("---")
+
+    # 평가 내역 테이블 출력
     if df.empty or len(df) == 0:
         st.info("아직 입력된 평가 데이터가 없습니다.")
     else:
@@ -200,16 +230,6 @@ with tab3:
         display_df.rename(columns={"evaluator": "평가자", "target": "평가 대상자"}, inplace=True)
         display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(2)
 
-        filter_col1, filter_col2 = st.columns(2)
-
-        evaluator_list = ["전체"] + list(display_df["평가자"].unique())
-        target_list = ["전체"] + list(display_df["평가 대상자"].unique())
-
-        with filter_col1:
-            sel_evaluator = st.selectbox("👤 평가자 필터", evaluator_list)
-        with filter_col2:
-            sel_target = st.selectbox("🎯 평가 대상자 필터", target_list)
-
         filtered_df = display_df.copy()
 
         if sel_evaluator != "전체":
@@ -218,5 +238,5 @@ with tab3:
         if sel_target != "전체":
             filtered_df = filtered_df[filtered_df["평가 대상자"] == sel_target]
 
-        st.markdown(f"**총 {len(filtered_df)}건의 평가 데이터가 검색되었습니다.**")
+        st.markdown(f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**")
         st.dataframe(filtered_df, use_container_width=True)
