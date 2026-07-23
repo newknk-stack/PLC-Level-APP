@@ -5,3 +5,4 @@ gspread
 google-auth
 openpyxl
 extra-streamlit-components
+oauth2client
