@@ -1,7 +1,8 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2.service_account import Credentials
 
 # 평가 항목 및 기본 정보 정의
 ITEMS = ["S/W 분석 및 이해", "발표 자료 완성도", "발표력", "활용도", "S/W 난이도"]
@@ -18,15 +19,37 @@ st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 # -------------------------------------------------------------------
-# 구글 시트 연동 설정 (st-gsheets-connection)
+# 구글 시트 연동 설정 (gspread + google.oauth2)
 # -------------------------------------------------------------------
-conn = st.connection("gsheets", type=GSheetsConnection)
+@st.cache_resource
+def get_gspread_client():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    # Secrets의 gcp_service_account 사전을 가져옵니다.
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # private_key의 \n 개행 처리 보완
+    if "\\n" in creds_dict["private_key"]:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    client = gspread.authorize(creds)
+    return client
+
+def get_worksheet():
+    client = get_gspread_client()
+    sheet_url = st.secrets["private_gsheets_url"]
+    sheet = client.open_by_url(sheet_url).sheet1
+    return sheet
 
 # 데이터 불러오기 함수
 def load_data():
     try:
-        # ttl=0 설정으로 시트 데이터를 실시간으로 읽어옵니다.
-        df = conn.read(ttl=0)
+        sheet = get_worksheet()
+        records = sheet.get_all_records()
+        df = pd.DataFrame(records)
         if df.empty:
             df = pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
         return df
@@ -88,8 +111,10 @@ with tab1:
             else:
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-            # 구글 시트 업데이트
-            conn.update(data=df)
+            # 구글 시트에 업데이트 저장 (전체 덮어쓰기)
+            sheet = get_worksheet()
+            sheet.clear()
+            sheet.update([df.columns.values.tolist()] + df.values.tolist())
             
             st.success(f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 구글 시트에 저장되었습니다!")
         except Exception as e:
