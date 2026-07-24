@@ -369,86 +369,61 @@ with tab1:
 
             # 타이틀 옆에 안내 텍스트 배치
             st.markdown(
-                f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
+                f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 6px;'>"
                 f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
                 f"<span style='color: #888;'>L3(최상): {l3_p}% &nbsp;|&nbsp; L2(상): {l2_p}% &nbsp;|&nbsp; L1(중): {l1_p}% &nbsp;|&nbsp; L0(하): {l0_p}%</span>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
-            # 소프트 파스텔 톤 색상 조합 (L3 -> L2 -> L1 -> L0 순서)
+            # 소프트 파스텔 톤 색상 정의
             raw_levels = [
-                ("L3", l3_p, "#5C5470", "white"),
-                ("L2", l2_p, "#7C83FD", "white"),
-                ("L1", l1_p, "#70A288", "white"),
+                ("L3", l3_p, "#5C5470", "#ffffff"),
+                ("L2", l2_p, "#7C83FD", "#ffffff"),
+                ("L1", l1_p, "#70A288", "#ffffff"),
                 ("L0", l0_p, "#D9B48F", "#333333"),
             ]
 
-            # 텍스트 가독성을 위한 최소 너비 보정
             active_levels = [item for item in raw_levels if item[1] > 0]
 
-            min_width = 8.0
-            chart_data = []
+            # ✨ HTML/CSS를 통한 양쪽 완전 둥근 캡슐형 막대 구현
+            segments_html = ""
+            for lbl, val, color, text_color in active_levels:
+                segments_html += f"""
+                <div style="
+                    width: {val}%; 
+                    background-color: {color}; 
+                    color: {text_color}; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    font-size: 0.82rem; 
+                    font-weight: bold; 
+                    font-family: sans-serif;
+                    box-sizing: border-box;
+                    border-right: 1px solid rgba(255, 255, 255, 0.4);
+                    white-space: nowrap;
+                    overflow: hidden;
+                " title="{lbl}: {val}%">
+                    {lbl} ({val}%)
+                </div>
+                """
 
-            if active_levels:
-                visual_widths = [
-                    max(val, min_width) for _, val, _, _ in active_levels
-                ]
-                sum_v_w = sum(visual_widths)
-                norm_widths = [(w / sum_v_w) * 100 for w in visual_widths]
+            capsule_html = f"""
+            <div style="
+                display: flex; 
+                width: 100%; 
+                height: 28px; 
+                border-radius: 14px; 
+                overflow: hidden; 
+                box-shadow: inset 0 0 2px rgba(0,0,0,0.1);
+                margin-bottom: 10px;
+            ">
+                {segments_html}
+            </div>
+            """
 
-                for (lbl, val, color, text_color), n_w in zip(
-                    active_levels, norm_widths
-                ):
-                    text_str = f"<b>{lbl} ({val}%)</b>"
-                    chart_data.append(
-                        (lbl, val, n_w, color, text_color, text_str)
-                    )
-
-            # Plotly 막대 차트 생성 (모서리 둥글게 적용)
-            fig_bar = go.Figure()
-
-            for lbl, val, vis_w, color, text_color, text_str in chart_data:
-                fig_bar.add_trace(
-                    go.Bar(
-                        y=["분포"],
-                        x=[vis_w],
-                        name=lbl,
-                        orientation="h",
-                        marker=dict(
-                            color=color,
-                            cornerradius=10  # ✨ 모서리를 둥글게 만들어 주는 옵션
-                        ),
-                        text=text_str,
-                        textposition="inside",
-                        textfont=dict(
-                            color=text_color, size=12, family="sans-serif"
-                        ),
-                        hovertemplate=f"{lbl}: {val}%<extra></extra>",
-                    )
-                )
-
-            fig_bar.update_layout(
-                barmode="stack",
-                xaxis=dict(
-                    range=[0, 100],
-                    showgrid=False,
-                    showticklabels=False,
-                    zeroline=False,
-                ),
-                yaxis=dict(showgrid=False, showticklabels=False),
-                margin=dict(l=0, r=0, t=0, b=0),
-                height=32,
-                showlegend=False,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-            )
-
-            st.plotly_chart(
-                fig_bar,
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
+            st.markdown(capsule_html, unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
