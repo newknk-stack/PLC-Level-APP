@@ -216,11 +216,21 @@ TABLE_STYLE = """
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
-    st.markdown(
-        '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
-        unsafe_allow_html=True,
-    )
-    st.title("🔐 PLC S/W 역량 진단 평가 시스템")
+    col_l_title, col_l_logo = st.columns([5, 1])
+    with col_l_title:
+        st.markdown(
+            '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
+            unsafe_allow_html=True,
+        )
+        st.title("🔐 PLC S/W 역량 진단 평가 시스템")
+    with col_l_logo:
+        st.markdown(
+            '<div style="display: flex; align-items: center; justify-content: flex-end; height: 100%; padding-top: 15px;">'
+            '<h3 style="color: #002D62; font-weight: 900; font-family: sans-serif; letter-spacing: -1px; margin: 0;">POSCO<span style="color: #FF6600;">DX</span></h3>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
     st.write("시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요.")
 
     with st.form("login_form"):
@@ -261,11 +271,20 @@ if st.sidebar.button("🚪 로그아웃", type="secondary"):
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
-st.markdown(
-    '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
-    unsafe_allow_html=True,
-)
-st.title("⚡ PLC S/W 역량 진단 평가 시스템")
+col_title, col_logo = st.columns([5, 1])
+with col_title:
+    st.markdown(
+        '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
+        unsafe_allow_html=True,
+    )
+    st.title("⚡ PLC S/W 역량 진단 평가 시스템")
+with col_logo:
+    st.markdown(
+        '<div style="display: flex; align-items: center; justify-content: flex-end; height: 100%; padding-top: 15px;">'
+        '<h3 style="color: #002D62; font-weight: 900; font-family: sans-serif; letter-spacing: -1px; margin: 0;">POSCO<span style="color: #FF6600;">DX</span></h3>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # -------------------------------------------------------------------
