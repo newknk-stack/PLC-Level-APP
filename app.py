@@ -699,6 +699,19 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
+        # 🏆 등급 현황 통계를 맨 위로 이동
+        st.markdown("### 🏆 등급 현황 통계")
+        grade_series = pd.Series(raw_grades_list)
+        grade_counts = grade_series.value_counts().reindex(
+            ["S", "A", "B", "C", "D"], fill_value=0
+        )
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+        for i, g in enumerate(["S", "A", "B", "C", "D"]):
+            eval(f"c{i+1}").metric(f"{g} 등급", f"{grade_counts[g]} 명")
+
+        st.markdown("---")
+
         sort_option = st.radio(
             "📌 **표 정렬 방식 선택**",
             ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
@@ -716,16 +729,6 @@ with tab2:
             index=False, escape=False, classes="styled-table"
         )
         st.markdown(CUSTOM_STYLE + html_table, unsafe_allow_html=True)
-
-        st.markdown("### 🏆 등급 현황 통계")
-        grade_series = pd.Series(raw_grades_list)
-        grade_counts = grade_series.value_counts().reindex(
-            ["S", "A", "B", "C", "D"], fill_value=0
-        )
-
-        c1, c2, c3, c4, c5 = st.columns(5)
-        for i, g in enumerate(["S", "A", "B", "C", "D"]):
-            eval(f"c{i+1}").metric(f"{g} 등급", f"{grade_counts[g]} 명")
 
         st.markdown("### 📈 피평가자별 역량 방사형 차트")
         selected_target = st.selectbox(
