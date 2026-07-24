@@ -304,7 +304,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력 (눈금선 바 중첩 & 숫자는 하단 표시)
+# TAB 1: 평가 점수 입력 (바 중첩 눈금선 및 하단 숫자 배치)
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
@@ -448,52 +448,42 @@ with tab1:
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
-    # 🎨 눈금선 바 중첩 & 숫자는 하단에 배치하는 CSS 스타일
+    # 🎨 슬라이더 스타일 및 눈금선 중첩 스타일 지정
     st.markdown(
         """
         <style>
-            /* 슬라이더 영역 여백 잡기 */
             div[data-testid="stSlider"] {
                 padding-bottom: 0px;
             }
-            
-            /* 기본 하단 min/max 텍스트 가리기 */
             div[data-testid="stSlider"] [data-testid="stTickBar"] {
                 display: none;
             }
-
-            /* 슬라이더 트랙과 중첩되는 눈금선 및 아래쪽 숫자를 만드는 레이어 */
             .slider-tick-container {
                 display: flex;
                 justify-content: space-between;
                 position: relative;
-                top: -18px; /* 바와 눈금선 수직 중첩 위치 */
+                top: -18px;
                 padding: 0 11px;
                 pointer-events: none;
                 margin-bottom: -10px;
                 z-index: 1;
             }
-
             .slider-tick-item {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 width: 14px;
             }
-
-            /* 바와 수직으로 중첩(교차)되는 눈금선 */
             .slider-tick-mark {
                 width: 1.5px;
-                height: 12px; /* 바 위아래로 교차되도록 높이 지정 */
+                height: 12px;
                 background-color: #a0a0a0;
             }
-
-            /* 눈금선 바로 밑에 표시될 숫자 */
             .slider-tick-label {
                 font-size: 0.70rem;
                 color: #777777;
                 font-weight: 500;
-                margin-top: 4px; /* 눈금선과 숫자 사이 간격 */
+                margin-top: 4px;
             }
         </style>
         """,
@@ -503,7 +493,6 @@ with tab1:
     scores = {}
     items_per_row = 2
 
-    # 눈금 및 숫자를 동적으로 생성하는 HTML 템플릿
     ticks_html = """
     <div class="slider-tick-container">
     """ + "".join([f"""
@@ -521,7 +510,6 @@ with tab1:
         
         for j, item in enumerate(row_items):
             with cols[j]:
-                # 1. 슬라이더 바 배치
                 scores[item] = st.slider(
                     f"{item}", 
                     min_value=0, 
@@ -530,8 +518,7 @@ with tab1:
                     step=1,
                     key=f"slide_{item}"
                 )
-                
-                # 2. 바에 중첩되는 눈금선 및 하단 숫자 HTML 배치
+                # 🔥 핵심 수정: unsafe_allow_html=True를 추가하여 태그가 텍스트로 노출되지 않고 정상 렌더링되도록 수정
                 st.markdown(ticks_html, unsafe_allow_html=True)
 
     st.markdown("---")
