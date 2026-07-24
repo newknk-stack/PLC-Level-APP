@@ -351,7 +351,7 @@ with tab1:
     scores = {}
 
     # 20개 항목 4x5 배치 (라벨 글자 겹침 방지)
-    items_per_row = 4
+    items_per_row = 2
     for i in range(0, len(ITEMS), items_per_row):
         row_items = ITEMS[i : i + items_per_row]
         cols = st.columns(len(row_items))
