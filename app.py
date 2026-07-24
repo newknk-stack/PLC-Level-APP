@@ -12,7 +12,7 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🍪 쿠키 매니저 및 로그인 세션 제어 (중복 렌더링 방지 처리)
+# 🍪 쿠키 매니저 및 로그인 세션 제어
 # -------------------------------------------------------------------
 cookie_manager = stx.CookieManager(key="cookie_manager")
 
@@ -23,7 +23,7 @@ if "user_name" not in st.session_state:
 if "logout_triggered" not in st.session_state:
     st.session_state["logout_triggered"] = False
 
-# 쿠키에서 로그인 정보 복원 (로그아웃 버튼을 누르지 않은 경우에만)
+# 쿠키에서 로그인 정보 복원
 if not st.session_state["logged_in"] and not st.session_state["logout_triggered"]:
     saved_user = cookie_manager.get("logged_in_user")
     if saved_user:
@@ -123,8 +123,22 @@ df_comp = load_competency_data()
 
 
 # -------------------------------------------------------------------
-# 🎨 등급별 개별 HTML 색상 생성 함수
+# 🎨 등급 계산 및 HTML 색상 함수 (요청사항 반영)
 # -------------------------------------------------------------------
+def calculate_grade(total_score):
+    """10개 항목 합산 점수(100점 만점) 기준 등급 산정"""
+    if total_score >= 90.0:
+        return "S"
+    elif total_score >= 80.0:
+        return "A"
+    elif total_score >= 70.0:
+        return "B"
+    elif total_score >= 60.0:
+        return "C"
+    else:
+        return "D"
+
+
 def get_colored_grade_html(est_grade, pre_grade):
     color_map = {
         "S": "#8E44AD",
@@ -149,19 +163,6 @@ def get_pre_grade(target_full_name):
     if not m.empty:
         return m.iloc[0]["등급"]
     return "-"
-
-
-def calculate_grade(avg_score):
-    if avg_score >= 9.0:
-        return "S"
-    elif avg_score >= 8.0:
-        return "A"
-    elif avg_score >= 7.0:
-        return "B"
-    elif avg_score >= 6.0:
-        return "C"
-    else:
-        return "D"
 
 
 TABLE_STYLE = """
@@ -197,7 +198,7 @@ TABLE_STYLE = """
 """
 
 # -------------------------------------------------------------------
-# 🔐 로그인 화면 (완전 격리 처리)
+# 🔐 로그인 화면
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
     st.title("🔐 PLC S/W 역량 진단 평가 시스템")
@@ -224,12 +225,11 @@ if not st.session_state["logged_in"]:
             else:
                 st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
 
-    # 로그인 안 되었을 시 아래 메인 앱 화면 코드가 절대 실행되지 않도록 확실하게 중단
     st.stop()
 
 
 # -------------------------------------------------------------------
-# 👤 사이드바 (로그인 완료 후에만 렌더링)
+# 👤 사이드바
 # -------------------------------------------------------------------
 st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
@@ -246,7 +246,7 @@ st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
-# ☁️ 구글 시트 연동 설정 (안전한 캐시 제어)
+# ☁️ 구글 시트 연동 설정
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_gspread_client():
@@ -462,8 +462,9 @@ with tab1:
 
     st.markdown("---")
 
-    current_avg = np.mean(list(scores.values())) if scores else 0.0
-    current_est_grade = calculate_grade(current_avg)
+    # 1인 평가 시: 10개 항목 점수 합산 (100점 만점)
+    current_total_score = float(np.sum(list(scores.values()))) if scores else 0.0
+    current_est_grade = calculate_grade(current_total_score)
     current_pre_grade = get_pre_grade(target)
     colored_grade_display = get_colored_grade_html(
         current_est_grade, current_pre_grade
@@ -492,7 +493,7 @@ with tab1:
                 <div style="white-space: nowrap;">
                     <span style="font-size: 0.95rem; color: #555; margin-right: 8px;">기술평가 등급(사전):</span>
                     <span style="font-size: 1.2rem;">{colored_grade_display}</span>
-                    <span style="font-size: 0.9rem; color: #888; margin-left: 4px;">(평균 {current_avg:.1f}점)</span>
+                    <span style="font-size: 0.9rem; color: #888; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
                 </div>
             </div>
             """,
@@ -532,7 +533,7 @@ with tab1:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
 # -------------------------------------------------------------------
-# TAB 2: 종합 평가 결과 대시보드
+# TAB 2: 종합 평가 결과 대시보드 (수정 반영)
 # -------------------------------------------------------------------
 with tab2:
     st.subheader("종합 평가 현황")
@@ -551,10 +552,15 @@ with tab2:
         for target_person in df["target"].unique():
             sub_df = df[df["target"] == target_person]
             eval_count = len(sub_df)
+            
+            # 1. 항목별 점수 = 평가자들의 평균점수 (10점 만점)
             item_means = sub_df[ITEMS].mean()
-            total_avg = item_means.mean()
+            
+            # 2. 종합 평균점수 = 각 평가 항목별 평균점수의 합산 (100점 만점)
+            total_score = item_means.sum()
 
-            est_grade = calculate_grade(total_avg)
+            # 3. 종합 평균 점수에 따른 등급 산정 (90/80/70/60 기준)
+            est_grade = calculate_grade(total_score)
             pre_grade = get_pre_grade(target_person)
             raw_grades_list.append(est_grade)
 
@@ -563,13 +569,13 @@ with tab2:
             row = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
-                "종합 평균점수": round(total_avg, 1),
+                "종합 평균점수": round(total_score, 1),
                 "기술 평가 등급(사전)": colored_grade_html,
             }
             row_dl = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
-                "종합 평균점수": round(total_avg, 1),
+                "종합 평균점수": round(total_score, 1),
                 "기술 평가 등급(사전)": f"{est_grade} ({pre_grade})",
             }
 
@@ -626,7 +632,7 @@ with tab2:
         )
 
 # -------------------------------------------------------------------
-# TAB 3: 평가자별 / 대상자별 상세 조회
+# TAB 3: 평가자별 / 대상자별 상세 조회 (수정 반영)
 # -------------------------------------------------------------------
 with tab3:
     st.subheader("🔍 개별 평가 내역 상세 조회")
@@ -698,11 +704,12 @@ with tab3:
             inplace=True,
         )
 
-        display_df["평균 점수"] = display_df[ITEMS].mean(axis=1).round(1)
+        # 개별 평가건별 10개 항목 합산 점수
+        display_df["합산 점수"] = display_df[ITEMS].sum(axis=1).round(1)
         for item in ITEMS:
             display_df[item] = display_df[item].round(1)
 
-        display_df["_temp_est_grade"] = display_df["평균 점수"].apply(
+        display_df["_temp_est_grade"] = display_df["합산 점수"].apply(
             calculate_grade
         )
         display_df["_temp_pre_grade"] = display_df["평가 대상자"].apply(
@@ -720,7 +727,7 @@ with tab3:
             "평가자",
             "평가 대상자",
             "기술 평가 등급(사전)",
-            "평균 점수",
+            "합산 점수",
         ] + ITEMS
         display_df = display_df[column_order]
 
