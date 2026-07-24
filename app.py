@@ -345,22 +345,22 @@ with tab1:
             m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("사전 진단 등급", grade_badge)
             m2.metric(
-                "Level 3 (난이도 최상 S/W 이해 건수)",
+                "Level 3 (전문가 건수)",
                 f"{t_info['L3_cnt']}건",
                 f"{t_info['L3_pct']}%",
             )
             m3.metric(
-                "Level 2 (난이도 상 S/W 이해 건수)",
+                "Level 2 (우수/숙련 건수)",
                 f"{t_info['L2_cnt']}건",
                 f"{t_info['L2_pct']}%",
             )
             m4.metric(
-                "Level 1 (난이도 중 S/W 이해 건수)",
+                "Level 1 (보통/실전 건수)",
                 f"{t_info['L1_cnt']}건",
                 f"{t_info['L1_pct']}%",
             )
             m5.metric(
-                "Level 0 (난이도 하 S/W 이해 건수)",
+                "Level 0 (기초/미흡 건수)",
                 f"{t_info['L0_cnt']}건",
                 f"{t_info['L0_pct']}%",
                 delta_color="inverse",
@@ -374,16 +374,16 @@ with tab1:
             st.markdown(
                 f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
                 f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
-                f"<span style='color: #888;'>L3(최상): {l3_p}% &nbsp;|&nbsp; L2(상): {l2_p}% &nbsp;|&nbsp; L1(중): {l1_p}% &nbsp;|&nbsp; L0(하): {l0_p}%</span>"
+                f"<span style='color: #888;'>Level 3(전문가): {l3_p}% &nbsp;|&nbsp; Level 2(우수/숙련): {l2_p}% &nbsp;|&nbsp; Level 1(보통/실전): {l1_p}% &nbsp;|&nbsp; Level 0(기초/미흡): {l0_p}%</span>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
             raw_levels = [
-                ("L3", l3_p, "#5C5470", "white"),
-                ("L2", l2_p, "#7C83FD", "white"),
-                ("L1", l1_p, "#70A288", "white"),
-                ("L0", l0_p, "#D9B48F", "#333333"),
+                ("Level 3", l3_p, "#5C5470", "white"),
+                ("Level 2", l2_p, "#7C83FD", "white"),
+                ("Level 1", l1_p, "#70A288", "white"),
+                ("Level 0", l0_p, "#D9B48F", "#333333"),
             ]
 
             active_levels = [item for item in raw_levels if item[1] > 0]
