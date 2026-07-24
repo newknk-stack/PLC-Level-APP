@@ -12,7 +12,7 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭 및 테이블 디자인 커스텀 CSS (세련된 모던 블루 톤 적용)
+# 🎨 탭 및 테이블 디자인 커스텀 CSS (은은하고 옅은 소프트 블루 톤 적용)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
@@ -35,7 +35,7 @@ CUSTOM_STYLE = """
         padding: 0px 22px;
         font-size: 0.95rem;
         font-weight: 600;
-        color: #475569;
+        color: #64748B;
         border: 1px solid #E2E8F0;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -43,17 +43,17 @@ CUSTOM_STYLE = """
     /* 탭 마우스 호버 시 */
     .stTabs [data-baseweb="tab"]:hover {
         background-color: #F1F5F9;
-        color: #1E293B;
+        color: #334155;
         border-color: #CBD5E1;
     }
 
-    /* 선택된 활성 탭 스타일 (세련된 트렌디 블루 그라데이션 + 입체감) */
+    /* 선택된 활성 탭 스타일 (눈이 편안한 은은한 소프트 파스텔 블루 톤) */
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
-        color: #FFFFFF !important;
-        border-color: #1D4ED8 !important;
+        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%) !important;
+        color: #1E40AF !important;
+        border-color: #BFDBFE !important;
         border-radius: 10px !important;
-        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
     }
     
     /* 스트림릿 기본 하단 인디케이터 제거 */
@@ -397,7 +397,7 @@ def load_data():
 
 
 # -------------------------------------------------------------------
-# 📌 메인 탭 화면 (세련된 블루 톤 탭 적용)
+# 📌 메인 탭 화면 (소프트 파스텔 블루 톤 탭 적용)
 # -------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
     "📝  평가 입력",
