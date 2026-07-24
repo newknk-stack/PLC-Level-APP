@@ -216,6 +216,10 @@ TABLE_STYLE = """
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
+    st.markdown(
+        '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
+        unsafe_allow_html=True,
+    )
     st.title("🔐 PLC S/W 역량 진단 평가 시스템")
     st.write("시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요.")
 
@@ -257,6 +261,11 @@ if st.sidebar.button("🚪 로그아웃", type="secondary"):
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
+# 메인 화면 상단 조직명 문구 및 타이틀 추가
+st.markdown(
+    '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
+    unsafe_allow_html=True,
+)
 st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
@@ -665,12 +674,11 @@ with tab2:
         st.markdown("---")
         st.markdown(f"#### 📝 **[{selected_target}] 역량 진단 요약 리포트**")
 
-        # 각 항목별 점수를 기준으로 정렬하여 상위/하위 추출
         item_scores_series = pd.Series({item: target_info[item] for item in ITEMS})
         sorted_scores = item_scores_series.sort_values(ascending=False)
 
-        top_items = sorted_scores.head(3)   # 상위 3개 항목 (강점)
-        bottom_items = sorted_scores.tail(3).sort_values(ascending=True) # 하위 3개 항목 (보완점)
+        top_items = sorted_scores.head(3)
+        bottom_items = sorted_scores.tail(3).sort_values(ascending=True)
 
         sum_col1, sum_col2 = st.columns(2)
 
