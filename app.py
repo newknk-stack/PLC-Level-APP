@@ -12,7 +12,7 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭 및 테이블 디자인 커스텀 CSS (은은하고 옅은 소프트 블루 톤 적용)
+# 🎨 탭, 테이블 및 버튼 디자인 커스텀 CSS (은은하고 옅은 소프트 블루 톤 적용)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
@@ -59,6 +59,21 @@ CUSTOM_STYLE = """
     /* 스트림릿 기본 하단 인디케이터 제거 */
     .stTabs [data-baseweb="tab-highlight"] {
         display: none !important;
+    }
+
+    /* 🎨 스트림릿 primary 버튼 스타일을 부드러운 하늘색(Soft Sky Blue)으로 커스텀 */
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
+        color: #FFFFFF !important;
+        border: 1px solid #2563EB !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+        transition: all 0.2s ease-in-out;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
+        border-color: #1D4ED8 !important;
+        box-shadow: 0 6px 14px rgba(59, 130, 246, 0.35);
     }
 
     /* 기존 테이블 스타일 */
@@ -291,7 +306,7 @@ if not st.session_state["logged_in"]:
     with st.form("login_form"):
         user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
         input_pw = st.text_input("🔑 공동 비밀번호 입력", type="password")
-        submit = st.form_submit_button("로그인")
+        submit = st.form_submit_button("로그인", type="primary")
 
         if submit:
             correct_pw = st.secrets.get("common_password", "2026")
