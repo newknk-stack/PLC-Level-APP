@@ -367,7 +367,7 @@ with tab1:
             l2_p = t_info["L2_pct"]
             l3_p = t_info["L3_pct"]
 
-            # ✨ 타이틀 옆에 안내 텍스트 배치
+            # 타이틀 옆에 안내 텍스트 배치
             st.markdown(
                 f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
                 f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
@@ -376,15 +376,14 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-            # 1. 눈이 편안한 파스텔 톤 색상 조합 (L3 -> L2 -> L1 -> L0 순서)
+            # 파스텔 톤 색상 조합
             raw_levels = [
-                ("L3", l3_p, "#5C5470", "white"),    # 소프트 다크 톤
-                ("L2", l2_p, "#7C83FD", "white"),    # 파스텔 퍼플
-                ("L1", l1_p, "#70A288", "white"),    # 파스텔 민트/세이지
-                ("L0", l0_p, "#D9B48F", "#333333"),  # 파스텔 베이지
+                ("L3", l3_p, "#5C5470", "white"),
+                ("L2", l2_p, "#7C83FD", "white"),
+                ("L1", l1_p, "#70A288", "white"),
+                ("L0", l0_p, "#D9B48F", "#333333"),
             ]
 
-            # 2. 텍스트 가독성을 위한 최소 너비 보정
             active_levels = [item for item in raw_levels if item[1] > 0]
 
             min_width = 8.0
@@ -405,7 +404,6 @@ with tab1:
                         (lbl, val, n_w, color, text_color, text_str)
                     )
 
-            # 3. Plotly 막대 차트 생성
             fig_bar = go.Figure()
 
             for lbl, val, vis_w, color, text_color, text_str in chart_data:
@@ -471,16 +469,32 @@ with tab1:
         current_est_grade, current_pre_grade
     )
 
-    # 5:5 비율([1, 1]) 칼럼
+    # 💡 제출 버튼 세로 높이를 왼쪽 박스 높이와 맞추기 위한 CSS 추가
+    st.markdown(
+        """
+        <style>
+            div[data-testid="stColumn"]:nth-child(2) div.stButton > button {
+                height: 100% !important;
+                min-height: 72px !important;
+                font-size: 1.05rem !important;
+                font-weight: bold !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     btn_col1, btn_col2 = st.columns([1, 1])
 
     with btn_col1:
         st.markdown(
             f"""
-            <div style="background-color: #f8f9fa; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center;">
-                <span style="font-size: 0.95rem; color: #555;">기술평가 등급(사전):</span><br>
-                <span style="font-size: 1.25rem;">{colored_grade_display}</span>
-                <span style="font-size: 0.9rem; color: #888;"> (평균 {current_avg:.1f}점)</span>
+            <div style="background-color: #f8f9fa; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; height: 100%; min-height: 72px; display: flex; flex-direction: column; justify-content: center;">
+                <div>
+                    <span style="font-size: 0.95rem; color: #555;">기술평가 등급(사전):</span><br>
+                    <span style="font-size: 1.25rem;">{colored_grade_display}</span>
+                    <span style="font-size: 0.9rem; color: #888;"> (평균 {current_avg:.1f}점)</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
