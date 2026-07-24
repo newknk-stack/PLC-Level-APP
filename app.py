@@ -911,6 +911,12 @@ with tab3:
         if sel_target != "전체":
             filtered_df = filtered_df[filtered_df["평가 대상자"] == sel_target]
 
+        # 📌 1차: 평가자 이름순(오름차순), 2차: 합산 점수 높은순(내림차순) 정렬 적용
+        filtered_df = filtered_df.sort_values(
+            by=["평가자", "합산 점수"], 
+            ascending=[True, False]
+        )
+
         st.markdown(
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
         )
