@@ -376,7 +376,7 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-            # 소프트 파스텔 톤 색상 정의
+            # 파스텔 톤 색상 정의
             raw_levels = [
                 ("L3", l3_p, "#5C5470", "#ffffff"),
                 ("L2", l2_p, "#7C83FD", "#ffffff"),
@@ -386,44 +386,69 @@ with tab1:
 
             active_levels = [item for item in raw_levels if item[1] > 0]
 
-            # ✨ HTML/CSS를 통한 양쪽 완전 둥근 캡슐형 막대 구현
-            segments_html = ""
-            for lbl, val, color, text_color in active_levels:
-                segments_html += f"""
-                <div style="
-                    width: {val}%; 
-                    background-color: {color}; 
-                    color: {text_color}; 
-                    display: flex; 
-                    align-items: center; 
-                    justify-content: center; 
-                    font-size: 0.82rem; 
-                    font-weight: bold; 
-                    font-family: sans-serif;
-                    box-sizing: border-box;
-                    border-right: 1px solid rgba(255, 255, 255, 0.4);
-                    white-space: nowrap;
-                    overflow: hidden;
-                " title="{lbl}: {val}%">
-                    {lbl} ({val}%)
-                </div>
-                """
+            # ✨ Plotly를 활용한 양쪽 모서리 완벽 라운딩 바 차트 생성
+            fig_bar = go.Figure()
 
-            capsule_html = f"""
-            <div style="
-                display: flex; 
-                width: 100%; 
-                height: 28px; 
-                border-radius: 14px; 
-                overflow: hidden; 
-                box-shadow: inset 0 0 2px rgba(0,0,0,0.1);
-                margin-bottom: 10px;
-            ">
-                {segments_html}
-            </div>
-            """
+            # 1. 완벽한 둥근 모양 틀을 잡아주기 위한 배경 Base Bar (100% 폭)
+            if active_levels:
+                first_color = active_levels[0][2]
+                last_color = active_levels[-1][2]
 
-            st.markdown(capsule_html, unsafe_allow_html=True)
+                # 배경을 첫 색상으로 깔아서 완벽한 왼쪽 라운딩 보장
+                fig_bar.add_trace(
+                    go.Bar(
+                        y=["분포"],
+                        x=[100],
+                        orientation="h",
+                        marker=dict(
+                            color=first_color,
+                            cornerradius=12,  # 양쪽 모서리 완벽 라운딩
+                        ),
+                        hoverinfo="skip",
+                        showlegend=False,
+                    )
+                )
+
+            # 2. 실제 데이터 누적 막대 추가
+            fig_bar.add_traces([
+                go.Bar(
+                    y=["분포"],
+                    x=[val],
+                    name=lbl,
+                    orientation="h",
+                    marker=dict(
+                        color=color,
+                        cornerradius=12 if i == len(active_levels) - 1 else 0,
+                    ),
+                    text=f"<b>{lbl} ({val}%)</b>",
+                    textposition="inside",
+                    textfont=dict(color=text_color, size=12),
+                    hovertemplate=f"{lbl}: {val}%<extra></extra>",
+                )
+                for i, (lbl, val, color, text_color) in enumerate(active_levels)
+            ])
+
+            fig_bar.update_layout(
+                barmode="stack",
+                xaxis=dict(
+                    range=[0, 100],
+                    showgrid=False,
+                    showticklabels=False,
+                    zeroline=False,
+                ),
+                yaxis=dict(showgrid=False, showticklabels=False),
+                margin=dict(l=0, r=0, t=0, b=0),
+                height=32,
+                showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+
+            st.plotly_chart(
+                fig_bar,
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
 
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
