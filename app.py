@@ -367,17 +367,24 @@ with tab1:
             l2_p = t_info["L2_pct"]
             l3_p = t_info["L3_pct"]
 
-            st.caption("역량 수준별 분포 현황")
+            # ✨ 타이틀 옆에 안내 텍스트 배치
+            st.markdown(
+                f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
+                f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<span style='color: #888;'>L3(최상): {l3_p}% &nbsp;|&nbsp; L2(상): {l2_p}% &nbsp;|&nbsp; L1(중): {l1_p}% &nbsp;|&nbsp; L0(하): {l0_p}%</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
-            # 1. 원본 데이터 (L3 -> L2 -> L1 -> L0 순서)
+            # 1. 눈이 편안한 파스텔 톤 색상 조합 (L3 -> L2 -> L1 -> L0 순서)
             raw_levels = [
-                ("L3", l3_p, "#00A3E0", "white"),
-                ("L2", l2_p, "#702F98", "white"),
-                ("L1", l1_p, "#FFEE00", "#222222"),
-                ("L0", l0_p, "#00A859", "white"),
+                ("L3", l3_p, "#5C5470", "white"),    # 소프트 다크 톤
+                ("L2", l2_p, "#7C83FD", "white"),    # 파스텔 퍼플
+                ("L1", l1_p, "#70A288", "white"),    # 파스텔 민트/세이지
+                ("L0", l0_p, "#D9B48F", "#333333"),  # 파스텔 베이지
             ]
 
-            # 2. 텍스트 가독성을 위한 최소 너비 보정 (L0가 오른쪽에 배치됨)
+            # 2. 텍스트 가독성을 위한 최소 너비 보정
             active_levels = [item for item in raw_levels if item[1] > 0]
 
             min_width = 8.0
@@ -428,7 +435,7 @@ with tab1:
                 ),
                 yaxis=dict(showgrid=False, showticklabels=False),
                 margin=dict(l=0, r=0, t=0, b=0),
-                height=34,
+                height=32,
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -438,11 +445,6 @@ with tab1:
                 fig_bar,
                 use_container_width=True,
                 config={"displayModeBar": False},
-            )
-
-            # 텍스트 안내 라벨 (L3 -> L2 -> L1 -> L0)
-            st.caption(
-                f"L3(최상): {l3_p}% | L2(상): {l2_p}% | L1(중): {l1_p}% | L0(하): {l0_p}%"
             )
 
     st.markdown("---")
@@ -469,7 +471,7 @@ with tab1:
         current_est_grade, current_pre_grade
     )
 
-    # ✨ 요청하신 5:5 비율([1, 1])로 칼럼 설정
+    # 5:5 비율([1, 1]) 칼럼
     btn_col1, btn_col2 = st.columns([1, 1])
 
     with btn_col1:
