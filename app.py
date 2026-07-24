@@ -368,41 +368,37 @@ with tab1:
                 delta_color="inverse",
             )
 
-            # ✨ [개선] 100% 분할 커스텀 프로그레스 바 구현
-            l3_p = t_info["L3_pct"]
-            l2_p = t_info["L2_pct"]
-            l1_p = t_info["L1_pct"]
+            # 역량 수준별 비중 값
             l0_p = t_info["L0_pct"]
+            l1_p = t_info["L1_pct"]
+            l2_p = t_info["L2_pct"]
+            l3_p = t_info["L3_pct"]
 
-            st.markdown(
-                "<div style='font-size:0.85rem; color:#666; margin-top:10px; margin-bottom:5px; font-weight:bold;'>역량 수준별 분포 현황 (100% 비중)</div>",
-                unsafe_allow_html=True,
-            )
+            st.caption("역량 수준별 분포 현황")
 
-            # HTML & CSS 분할 바
-            custom_progress_html = f"""
-            <div style="width: 100%; background-color: #e0e0e0; border-radius: 8px; height: 26px; display: flex; overflow: hidden; font-size: 0.8rem; font-weight: bold; color: white; line-height: 26px; text-align: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
-                <div style="width: {l3_p}%; background-color: #8E44AD;" title="Level 3: {l3_p}%">
-                    {f'{l3_p}%' if l3_p >= 5 else ''}
+            # ✨ 이미지 형태의 플랫 멀티 컬러 바 + 각 레벨 텍스트 표출
+            custom_image_style_bar = f"""
+            <div style="width: 100%; height: 32px; display: flex; overflow: hidden; font-size: 0.82rem; font-weight: bold; line-height: 32px; text-align: center; margin-bottom: 6px;">
+                <div style="width: {l0_p}%; background-color: #00A859; color: white;" title="Level 0: {l0_p}%">
+                    {f'L0 ({l0_p}%)' if l0_p >= 7 else ''}
                 </div>
-                <div style="width: {l2_p}%; background-color: #2980B9;" title="Level 2: {l2_p}%">
-                    {f'{l2_p}%' if l2_p >= 5 else ''}
+                <div style="width: {l1_p}%; background-color: #FFEE00; color: #222;" title="Level 1: {l1_p}%">
+                    {f'L1 ({l1_p}%)' if l1_p >= 7 else ''}
                 </div>
-                <div style="width: {l1_p}%; background-color: #27AE60;" title="Level 1: {l1_p}%">
-                    {f'{l1_p}%' if l1_p >= 5 else ''}
+                <div style="width: {l2_p}%; background-color: #702F98; color: white;" title="Level 2: {l2_p}%">
+                    {f'L2 ({l2_p}%)' if l2_p >= 7 else ''}
                 </div>
-                <div style="width: {l0_p}%; background-color: #E67E22;" title="Level 0: {l0_p}%">
-                    {f'{l0_p}%' if l0_p >= 5 else ''}
+                <div style="width: {l3_p}%; background-color: #00A3E0; color: white;" title="Level 3: {l3_p}%">
+                    {f'L3 ({l3_p}%)' if l3_p >= 7 else ''}
                 </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-top: 6px; padding: 0 4px;">
-                <span style="color: #8E44AD; font-weight: bold;">■ L3 (최상): {l3_p}%</span>
-                <span style="color: #2980B9; font-weight: bold;">■ L2 (상): {l2_p}%</span>
-                <span style="color: #27AE60; font-weight: bold;">■ L1 (중): {l1_p}%</span>
-                <span style="color: #E67E22; font-weight: bold;">■ L0 (하): {l0_p}%</span>
             </div>
             """
-            st.markdown(custom_progress_html, unsafe_allow_html=True)
+            st.markdown(custom_image_style_bar, unsafe_allow_html=True)
+
+            # ✨ 기존 형식을 유지한 텍스트 라벨
+            st.caption(
+                f"L3(최상): {l3_p}% | L2(상): {l2_p}% | L1(중): {l1_p}% | L0(하): {l0_p}%"
+            )
 
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
