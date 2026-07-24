@@ -386,47 +386,23 @@ with tab1:
 
             active_levels = [item for item in raw_levels if item[1] > 0]
 
-            # ✨ Plotly를 활용한 양쪽 모서리 완벽 라운딩 바 차트 생성
+            # 📊 표준 Plotly 수평 누적 막대 차트
             fig_bar = go.Figure()
 
-            # 1. 완벽한 둥근 모양 틀을 잡아주기 위한 배경 Base Bar (100% 폭)
-            if active_levels:
-                first_color = active_levels[0][2]
-                last_color = active_levels[-1][2]
-
-                # 배경을 첫 색상으로 깔아서 완벽한 왼쪽 라운딩 보장
+            for lbl, val, color, text_color in active_levels:
                 fig_bar.add_trace(
                     go.Bar(
                         y=["분포"],
-                        x=[100],
+                        x=[val],
+                        name=lbl,
                         orientation="h",
-                        marker=dict(
-                            color=first_color,
-                            cornerradius=12,  # 양쪽 모서리 완벽 라운딩
-                        ),
-                        hoverinfo="skip",
-                        showlegend=False,
+                        marker=dict(color=color),
+                        text=f"<b>{lbl} ({val}%)</b>",
+                        textposition="inside",
+                        textfont=dict(color=text_color, size=12),
+                        hovertemplate=f"{lbl}: {val}%<extra></extra>",
                     )
                 )
-
-            # 2. 실제 데이터 누적 막대 추가
-            fig_bar.add_traces([
-                go.Bar(
-                    y=["분포"],
-                    x=[val],
-                    name=lbl,
-                    orientation="h",
-                    marker=dict(
-                        color=color,
-                        cornerradius=12 if i == len(active_levels) - 1 else 0,
-                    ),
-                    text=f"<b>{lbl} ({val}%)</b>",
-                    textposition="inside",
-                    textfont=dict(color=text_color, size=12),
-                    hovertemplate=f"{lbl}: {val}%<extra></extra>",
-                )
-                for i, (lbl, val, color, text_color) in enumerate(active_levels)
-            ])
 
             fig_bar.update_layout(
                 barmode="stack",
@@ -438,7 +414,7 @@ with tab1:
                 ),
                 yaxis=dict(showgrid=False, showticklabels=False),
                 margin=dict(l=0, r=0, t=0, b=0),
-                height=32,
+                height=30,
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
