@@ -12,53 +12,53 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭 및 테이블 디자인 커스텀 CSS (활성 탭 글자색 및 배경 오류 수정 완료)
+# 🎨 탭 및 테이블 디자인 커스텀 CSS (모던 & 세련된 스타일 적용)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
-    /* 탭 네비게이션 컨테이너 스타일 */
+    /* 탭 네비게이션 컨테이너 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-        background-color: #F1F5F9;
-        padding: 10px 15px;
-        border-radius: 12px;
-        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        gap: 8px;
+        background-color: #F8FAFC;
+        padding: 8px 12px;
+        border-radius: 14px;
+        border: 1px solid #E2E8F0;
     }
     
-    /* 각 탭 버튼 스타일 */
+    /* 각 탭 버튼 기본 스타일 (모던한 알약/라운드 형태) */
     .stTabs [data-baseweb="tab"] {
-        height: 50px;
+        height: 44px;
         white-space: pre-wrap;
-        background-color: #FFFFFF;
-        border-radius: 8px;
+        background-color: transparent;
+        border-radius: 10px;
         gap: 8px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-        padding-left: 20px;
-        padding-right: 20px;
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #475569;
-        border: 1px solid #CBD5E1;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        transition: all 0.2s ease-in-out;
+        padding: 0px 20px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #64748B;
+        border: none;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* 탭 마우스 호버 시 */
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #E2E8F0;
-        color: #1E293B;
-        border-color: #94A3B8;
+        background-color: #F1F5F9;
+        color: #0F172A;
     }
 
-    /* 선택된 활성 탭 스타일 */
+    /* 선택된 활성 탭 스타일 (세련된 다크/인디고 톤 + 입체감) */
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
+        background: linear-gradient(135deg, #0F172A 100%, #1E293B 100%) !important;
         color: #FFFFFF !important;
-        border-color: #0F172A !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+        border-radius: 10px !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
     }
     
+    /* 스트림릿 기본 하단 빨간줄/인디케이터 제거 */
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+
     /* 기존 테이블 스타일 */
     .styled-table {
         width: 100%;
@@ -66,7 +66,7 @@ CUSTOM_STYLE = """
         margin: 10px 0;
         font-size: 0.85rem;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         border-radius: 8px;
         overflow: hidden;
         border: 1px solid #E2E8F0;
@@ -395,7 +395,7 @@ def load_data():
 
 
 # -------------------------------------------------------------------
-# 📌 메인 탭 화면 (가독성이 향상된 탭 적용)
+# 📌 메인 탭 화면 (세련된 알약 형태 탭 적용)
 # -------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
     "📝  평가 입력",
