@@ -12,7 +12,7 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭 및 테이블 디자인 커스텀 CSS
+# 🎨 탭 및 테이블 디자인 커스텀 CSS (활성 탭 글자색 및 배경 오류 수정 완료)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
@@ -53,7 +53,7 @@ CUSTOM_STYLE = """
 
     /* 선택된 활성 탭 스타일 */
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100% !important);
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
         color: #FFFFFF !important;
         border-color: #0F172A !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
