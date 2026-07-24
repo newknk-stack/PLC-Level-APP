@@ -25,7 +25,7 @@ if "logout_triggered" not in st.session_state:
 # 브라우저 쿠키 확인
 saved_user = cookie_manager.get(cookie="logged_in_user")
 
-# 🔥 로그인 수행
+# 로그인 수행
 if (
     saved_user
     and not st.session_state["logged_in"]
@@ -83,7 +83,7 @@ TARGETS = sorted([
 
 
 # -------------------------------------------------------------------
-# 📊 2026년 상반기 역량 진단 데이터 파싱 함수 (Level 0 ~ Level 3 포함)
+# 📊 2026년 상반기 역량 진단 데이터 파싱 함수
 # -------------------------------------------------------------------
 @st.cache_data
 def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
@@ -249,7 +249,7 @@ st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
-# ☁️ 구글 시트 연동 설정
+# ☁️ 구글 시트 연동 설정 (API 초과 방지 캐싱 적용)
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_gspread_client():
@@ -276,6 +276,8 @@ def get_worksheet():
     return sheet
 
 
+# API Quota 초과 방지를 위해 10초간 캐시(ttl=10) 유지
+@st.cache_data(ttl=10)
 def load_data():
     try:
         sheet = get_worksheet()
@@ -289,6 +291,10 @@ def load_data():
                     df[item] = 0
         return df
     except Exception as e:
+        if "429" in str(e):
+            st.warning("⚠️ 구글 API 요청 한도 초과로 잠시 대기 중입니다. 5초 후 자동으로 다시 시도합니다.")
+            time.sleep(5)
+            return load_data()
         st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
@@ -367,7 +373,7 @@ with tab1:
             l2_p = t_info["L2_pct"]
             l3_p = t_info["L3_pct"]
 
-            # 타이틀 옆에 안내 텍스트 배치
+            # 타이틀 옆 안내 텍스트
             st.markdown(
                 f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
                 f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
@@ -505,6 +511,7 @@ with tab1:
             "점수 저장 및 제출", type="primary", use_container_width=True
         ):
             try:
+                # 저장 시 최신 데이터 읽기
                 df = load_data()
 
                 existing_idx = df[
@@ -523,6 +530,9 @@ with tab1:
                 sheet = get_worksheet()
                 sheet.clear()
                 sheet.update([df.columns.values.tolist()] + df.values.tolist())
+
+                # 💡 데이터를 새로 저장했으므로 캐시 초기화
+                st.cache_data.clear()
 
                 st.success(
                     f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 성공적으로 저장되었습니다!"
