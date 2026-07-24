@@ -396,7 +396,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력 (- 버튼, 색상 적용된 중앙 숫자, + 버튼 배치)
+# TAB 1: 평가 점수 입력 (드래그 슬라이더 방식 적용)
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
@@ -465,7 +465,7 @@ with tab1:
             )
 
     st.markdown("---")
-    st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
+    st.write("각 항목별 점수를 드래그하여 입력하세요 (0점 ~ 10점)")
 
     scores = {}
     items_per_row = 2
@@ -475,24 +475,14 @@ with tab1:
         cols = st.columns(len(row_items))
         for j, item in enumerate(row_items):
             with cols[j]:
-                st.markdown(
-                    f"<p style='font-weight: 600; margin-bottom: 4px;'>{item}</p>",
-                    unsafe_allow_html=True,
+                score_val = st.slider(
+                    f"{item}", 
+                    min_value=0, 
+                    max_value=10, 
+                    value=5, 
+                    step=1, 
+                    key=f"slider_{item}"
                 )
-
-                if f"val_{item}" not in st.session_state:
-                    st.session_state[f"val_{item}"] = 5
-
-                # - / 숫자 / + 버튼 레이아웃 구성
-                b_col1, b_col2, b_col3 = st.columns([1, 1.2, 1])
-
-                with b_col1:
-                    if st.button("➖", key=f"minus_{item}", use_container_width=True):
-                        if st.session_state[f"val_{item}"] > 0:
-                            st.session_state[f"val_{item}"] -= 1
-                            st.rerun()
-
-                score_val = st.session_state[f"val_{item}"]
                 scores[item] = score_val
 
                 # 신호등 체계 색상 매핑
@@ -503,27 +493,11 @@ with tab1:
                 else:
                     bar_color = "#42A5F5"  # 파랑
 
-                with b_col2:
-                    st.markdown(
-                        f"""
-                        <div style="text-align: center; padding-top: 4px;">
-                            <span style="font-size: 1.2rem; font-weight: bold; color: {bar_color};">{score_val}점</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                with b_col3:
-                    if st.button("➕", key=f"plus_{item}", use_container_width=True):
-                        if st.session_state[f"val_{item}"] < 10:
-                            st.session_state[f"val_{item}"] += 1
-                            st.rerun()
-
-                # 하단 컬러 게이지 바
+                # 하단 컬러 게이지 바 연동
                 pct = int(score_val * 10)
                 st.markdown(
                     f"""
-                    <div style="background-color: #E2E8F0; border-radius: 4px; width: 100%; height: 8px; margin-top: 6px; margin-bottom: 20px; overflow: hidden;">
+                    <div style="background-color: #E2E8F0; border-radius: 4px; width: 100%; height: 8px; margin-top: -6px; margin-bottom: 20px; overflow: hidden;">
                         <div style="background-color: {bar_color}; width: {pct}%; height: 100%; transition: width 0.2s ease;"></div>
                     </div>
                     """,
