@@ -184,7 +184,6 @@ TABLE_STYLE = """
         color: #FFFFFF;
         text-align: center;
         font-weight: 600;
-        /* 헤더 항목은 2줄로 자연스럽게 개행되도록 설정 */
         white-space: normal;
         word-break: keep-all;
         line-height: 1.3;
@@ -202,7 +201,6 @@ TABLE_STYLE = """
         text-align: center;
         border-bottom: 1px solid #E2E8F0;
         color: #334155;
-        /* 데이터 셀은 1줄 유지 (필요시 조정 가능) */
         white-space: nowrap;
     }
     .styled-table tbody tr:nth-of-type(even) {
@@ -328,13 +326,11 @@ with tab1:
 
     evaluator = st.session_state["user_name"]
 
-    # 현재 로그인한 평가자가 이미 평가를 완료한 대상자 목록 추출
     df_current = load_data()
     completed_targets = []
     if not df_current.empty and "evaluator" in df_current.columns and "target" in df_current.columns:
         completed_targets = df_current[df_current["evaluator"] == evaluator]["target"].tolist()
 
-    # 대상자 셀렉트박스 목록 생성 (평가 완료된 대상자에게 표시 추가)
     display_targets = []
     for t in TARGETS:
         if t in completed_targets:
@@ -349,10 +345,8 @@ with tab1:
         )
     with col2:
         selected_display_target = st.selectbox("평가 대상자 선택", display_targets)
-        # 선택된 값에서 ' (✅ 평가 완료)' 문자열 제거하여 원본 대상자 이름 복원
         target = selected_display_target.replace("  (✅ 평가 완료)", "")
 
-    # 사전 역량 진단 참고 정보 표출
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
         match = df_comp[df_comp["이름"] == target_clean_name]
@@ -664,6 +658,39 @@ with tab2:
         )
         fig.update_traces(fill="toself")
         st.plotly_chart(fig, use_container_width=True)
+
+        # -------------------------------------------------------------------
+        # 💡 평가 기반 장점 및 보완점 자동 요약 표출 영역
+        # -------------------------------------------------------------------
+        st.markdown("---")
+        st.markdown(f"#### 📝 **[{selected_target}] 역량 진단 요약 리포트**")
+
+        # 각 항목별 점수를 기준으로 정렬하여 상위/하위 추출
+        item_scores_series = pd.Series({item: target_info[item] for item in ITEMS})
+        sorted_scores = item_scores_series.sort_values(ascending=False)
+
+        top_items = sorted_scores.head(3)   # 상위 3개 항목 (강점)
+        bottom_items = sorted_scores.tail(3).sort_values(ascending=True) # 하위 3개 항목 (보완점)
+
+        sum_col1, sum_col2 = st.columns(2)
+
+        with sum_col1:
+            st.success("##### 🌟 주요 강점 요약")
+            strengths_text = ""
+            for idx, (it_name, it_score) in enumerate(top_items.items(), 1):
+                strengths_text += f"**{idx}. {it_name}** ({it_score}점)\n"
+            strengths_text += f"\n👉 해당 인원은 **{top_items.index[0]}** 및 **{top_items.index[1]}** 분야에서 상대적으로 우수한 역량을 보여주고 있습니다."
+            st.markdown(strengths_text)
+
+        with sum_col2:
+            st.info("##### 💡 보완 및 발전 제안")
+            weaknesses_text = ""
+            for idx, (it_name, it_score) in enumerate(bottom_items.items(), 1):
+                weaknesses_text += f"**{idx}. {it_name}** ({it_score}점)\n"
+            weaknesses_text += f"\n👉 향후 **{bottom_items.index[0]}** 영역을 중심으로 집중적인 직무 교육과 피드백을 통해 역량을 보완할 필요가 있습니다."
+            st.markdown(weaknesses_text)
+
+        st.markdown("---")
 
         st.download_button(
             label="📥 평가 집계 결과 엑셀(CSV) 다운로드",
