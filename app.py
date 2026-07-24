@@ -165,36 +165,51 @@ def get_pre_grade(target_full_name):
     return "-"
 
 
+# 💡 가독성과 2줄 헤더 표시가 적용된 스타일 정의
 TABLE_STYLE = """
 <style>
     .styled-table {
         width: 100%;
         border-collapse: collapse;
         margin: 10px 0;
-        font-size: 0.8rem;
-        font-family: sans-serif;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
-        border-radius: 6px;
+        font-size: 0.85rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-radius: 8px;
         overflow: hidden;
+        border: 1px solid #E2E8F0;
     }
     .styled-table thead tr {
-        background-color: #0E1117;
-        color: #ffffff;
+        background-color: #1E293B;
+        color: #FFFFFF;
         text-align: center;
-        font-weight: bold;
-        white-space: nowrap;
+        font-weight: 600;
+        /* 헤더 항목은 2줄로 자연스럽게 개행되도록 설정 */
+        white-space: normal;
+        word-break: keep-all;
+        line-height: 1.3;
     }
-    .styled-table th, .styled-table td {
-        padding: 6px 8px;
+    .styled-table th {
+        padding: 10px 8px;
         text-align: center;
-        border-bottom: 1px solid #e0e0e0;
+        border-right: 1px solid #334155;
+    }
+    .styled-table th:last-child {
+        border-right: none;
+    }
+    .styled-table td {
+        padding: 8px 10px;
+        text-align: center;
+        border-bottom: 1px solid #E2E8F0;
+        color: #334155;
+        /* 데이터 셀은 1줄 유지 (필요시 조정 가능) */
         white-space: nowrap;
     }
     .styled-table tbody tr:nth-of-type(even) {
-        background-color: #f8f9fa;
+        background-color: #F8FAFC;
     }
     .styled-table tbody tr:hover {
-        background-color: #f1f3f5;
+        background-color: #EEF2FF;
     }
 </style>
 """
