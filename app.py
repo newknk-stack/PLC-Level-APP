@@ -12,49 +12,51 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭 및 테이블 디자인 커스텀 CSS (모던 & 세련된 스타일 적용)
+# 🎨 탭 및 테이블 디자인 커스텀 CSS (세련된 모던 블루 톤 적용)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
     /* 탭 네비게이션 컨테이너 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 10px;
         background-color: #F8FAFC;
-        padding: 8px 12px;
+        padding: 10px 14px;
         border-radius: 14px;
         border: 1px solid #E2E8F0;
     }
     
-    /* 각 탭 버튼 기본 스타일 (모던한 알약/라운드 형태) */
+    /* 각 탭 버튼 기본 스타일 (부드러운 라운드 & 차분한 글자색) */
     .stTabs [data-baseweb="tab"] {
-        height: 44px;
+        height: 46px;
         white-space: pre-wrap;
-        background-color: transparent;
+        background-color: #FFFFFF;
         border-radius: 10px;
         gap: 8px;
-        padding: 0px 20px;
+        padding: 0px 22px;
         font-size: 0.95rem;
         font-weight: 600;
-        color: #64748B;
-        border: none;
+        color: #475569;
+        border: 1px solid #E2E8F0;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* 탭 마우스 호버 시 */
     .stTabs [data-baseweb="tab"]:hover {
         background-color: #F1F5F9;
-        color: #0F172A;
+        color: #1E293B;
+        border-color: #CBD5E1;
     }
 
-    /* 선택된 활성 탭 스타일 (세련된 다크/인디고 톤 + 입체감) */
+    /* 선택된 활성 탭 스타일 (세련된 트렌디 블루 그라데이션 + 입체감) */
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #0F172A 100%, #1E293B 100%) !important;
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
         color: #FFFFFF !important;
+        border-color: #1D4ED8 !important;
         border-radius: 10px !important;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
     }
     
-    /* 스트림릿 기본 하단 빨간줄/인디케이터 제거 */
+    /* 스트림릿 기본 하단 인디케이터 제거 */
     .stTabs [data-baseweb="tab-highlight"] {
         display: none !important;
     }
@@ -395,7 +397,7 @@ def load_data():
 
 
 # -------------------------------------------------------------------
-# 📌 메인 탭 화면 (세련된 알약 형태 탭 적용)
+# 📌 메인 탭 화면 (세련된 블루 톤 탭 적용)
 # -------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
     "📝  평가 입력",
