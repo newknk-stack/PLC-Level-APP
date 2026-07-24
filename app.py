@@ -123,7 +123,7 @@ df_comp = load_competency_data()
 
 
 # -------------------------------------------------------------------
-# 🎨 등급 계산 및 HTML 색상 함수 (요청사항 반영)
+# 🎨 등급 계산 및 HTML 색상 함수
 # -------------------------------------------------------------------
 def calculate_grade(total_score):
     """10개 항목 합산 점수(100점 만점) 기준 등급 산정"""
@@ -462,7 +462,6 @@ with tab1:
 
     st.markdown("---")
 
-    # 1인 평가 시: 10개 항목 점수 합산 (100점 만점)
     current_total_score = float(np.sum(list(scores.values()))) if scores else 0.0
     current_est_grade = calculate_grade(current_total_score)
     current_pre_grade = get_pre_grade(target)
@@ -553,13 +552,9 @@ with tab2:
             sub_df = df[df["target"] == target_person]
             eval_count = len(sub_df)
             
-            # 1. 항목별 점수 = 평가자들의 평균점수 (10점 만점)
             item_means = sub_df[ITEMS].mean()
-            
-            # 2. 종합 평균점수 = 각 평가 항목별 평균점수의 합산 (100점 만점)
             total_score = item_means.sum()
 
-            # 3. 종합 평균 점수에 따른 등급 산정 (90/80/70/60 기준)
             est_grade = calculate_grade(total_score)
             pre_grade = get_pre_grade(target_person)
             raw_grades_list.append(est_grade)
@@ -590,6 +585,23 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
+        # ---------------------------------------------------------------
+        # 🔄 정렬방식 선택 옵션 (요청 반영)
+        # ---------------------------------------------------------------
+        sort_option = st.radio(
+            "📌 **표 정렬 방식 선택**",
+            ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
+            horizontal=True,
+        )
+
+        if sort_option == "피평가자 이름순":
+            summary_df.sort_values(by=["피평가자"], ascending=[True], inplace=True)
+        else:
+            # 1우선: 종합 평균점수 내림차순(높은순), 2우선: 피평가자 이름 오름차순(가나다순)
+            summary_df.sort_values(
+                by=["종합 평균점수", "피평가자"], ascending=[False, True], inplace=True
+            )
+
         html_table = summary_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
@@ -607,7 +619,7 @@ with tab2:
 
         st.markdown("### 📈 피평가자별 역량 방사형 차트")
         selected_target = st.selectbox(
-            "분석할 대상자 선택", summary_df["피평가자"].unique()
+            "분석할 대상자 선택", sorted(summary_df["피평가자"].unique())
         )
 
         target_info = summary_df[
@@ -632,7 +644,7 @@ with tab2:
         )
 
 # -------------------------------------------------------------------
-# TAB 3: 평가자별 / 대상자별 상세 조회 (수정 반영)
+# TAB 3: 평가자별 / 대상자별 상세 조회
 # -------------------------------------------------------------------
 with tab3:
     st.subheader("🔍 개별 평가 내역 상세 조회")
@@ -704,7 +716,6 @@ with tab3:
             inplace=True,
         )
 
-        # 개별 평가건별 10개 항목 합산 점수
         display_df["합산 점수"] = display_df[ITEMS].sum(axis=1).round(1)
         for item in ITEMS:
             display_df[item] = display_df[item].round(1)
