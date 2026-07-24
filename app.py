@@ -5,6 +5,7 @@ import gspread
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 # 페이지 기본 설정
@@ -376,26 +377,60 @@ with tab1:
 
             st.caption("역량 수준별 분포 현황")
 
-            # ✨ 이미지 형태의 플랫 멀티 컬러 바 + 각 레벨 텍스트 표출
-            custom_image_style_bar = f"""
-            <div style="width: 100%; height: 32px; display: flex; overflow: hidden; font-size: 0.82rem; font-weight: bold; line-height: 32px; text-align: center; margin-bottom: 6px;">
-                <div style="width: {l0_p}%; background-color: #00A859; color: white;" title="Level 0: {l0_p}%">
-                    {f'L0 ({l0_p}%)' if l0_p >= 7 else ''}
-                </div>
-                <div style="width: {l1_p}%; background-color: #FFEE00; color: #222;" title="Level 1: {l1_p}%">
-                    {f'L1 ({l1_p}%)' if l1_p >= 7 else ''}
-                </div>
-                <div style="width: {l2_p}%; background-color: #702F98; color: white;" title="Level 2: {l2_p}%">
-                    {f'L2 ({l2_p}%)' if l2_p >= 7 else ''}
-                </div>
-                <div style="width: {l3_p}%; background-color: #00A3E0; color: white;" title="Level 3: {l3_p}%">
-                    {f'L3 ({l3_p}%)' if l3_p >= 7 else ''}
-                </div>
-            </div>
-            """
-            st.markdown(custom_image_style_bar, unsafe_allow_html=True)
+            # ✨ [개선] Plotly를 이용한 100% 분할 플랫 막대 차트 (깨짐 현상 완벽 방지)
+            levels = [
+                ("L0", l0_p, "#00A859", "white"),
+                ("L1", l1_p, "#FFEE00", "#222222"),
+                ("L2", l2_p, "#702F98", "white"),
+                ("L3", l3_p, "#00A3E0", "white"),
+            ]
 
-            # ✨ 기존 형식을 유지한 텍스트 라벨
+            fig_bar = go.Figure()
+
+            for lbl, val, color, text_color in levels:
+                if val > 0:  # 0%인 항목은 깔끔하게 표시 제외
+                    text_str = (
+                        f"<b>{lbl} ({val}%)</b>" if val >= 5.0 else f"{val}%"
+                    )
+                    fig_bar.add_trace(
+                        go.Bar(
+                            y=["분포"],
+                            x=[val],
+                            name=lbl,
+                            orientation="h",
+                            marker=dict(color=color),
+                            text=text_str,
+                            textposition="inside",
+                            textfont=dict(
+                                color=text_color, size=13, family="sans-serif"
+                            ),
+                            hovertemplate=f"{lbl}: {val}%<extra></extra>",
+                        )
+                    )
+
+            fig_bar.update_layout(
+                barmode="stack",
+                xaxis=dict(
+                    range=[0, 100],
+                    showgrid=False,
+                    showticklabels=False,
+                    zeroline=False,
+                ),
+                yaxis=dict(showgrid=False, showticklabels=False),
+                margin=dict(l=0, r=0, t=0, b=0),
+                height=32,
+                showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+
+            st.plotly_chart(
+                fig_bar,
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+
+            # ✨ 기존 형식 텍스트 라벨 유지
             st.caption(
                 f"L3(최상): {l3_p}% | L2(상): {l2_p}% | L1(중): {l1_p}% | L0(하): {l0_p}%"
             )
