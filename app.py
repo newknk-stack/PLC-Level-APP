@@ -216,19 +216,22 @@ TABLE_STYLE = """
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
-    col_l_title, col_l_logo = st.columns([4, 2])
+    col_l_title, col_l_logo = st.columns([3.5, 2.5])
     with col_l_title:
         st.markdown(
-            '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
+            '<p style="color: #64748B; font-size: 1.1rem; font-weight: 600; margin-bottom: 2px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
             unsafe_allow_html=True,
         )
-        st.title("🔐 PLC S/W 역량 진단 평가 시스템")
+        st.markdown(
+            '<h1 style="font-size: 2.3rem; font-weight: 800; padding-top: 0px; margin-top: 0px;">🔐 PLC S/W 역량 진단 평가 시스템</h1>',
+            unsafe_allow_html=True,
+        )
     with col_l_logo:
         st.markdown(
-            '<div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%; padding-top: 10px;">'
-            '<span style="font-size: 1.1rem; font-weight: 900; font-family: sans-serif; letter-spacing: 1px; color: #111; line-height: 1.1;">posco</span>'
-            '<span style="font-size: 1.4rem; font-weight: 900; font-family: sans-serif; letter-spacing: -0.5px; color: #111; line-height: 1.2;">포스코DX</span>'
-            '<span style="font-size: 0.75rem; font-weight: 700; font-family: sans-serif; letter-spacing: 0.5px;"><span style="color: #C68A00;">AI</span> <span style="color: #555;">Native Company</span></span>'
+            '<div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%; padding-top: 5px;">'
+            '<span style="font-size: 1.4rem; font-weight: 900; font-family: sans-serif; letter-spacing: 1px; color: #111; line-height: 1.1;">posco</span>'
+            '<span style="font-size: 1.8rem; font-weight: 900; font-family: sans-serif; letter-spacing: -0.5px; color: #111; line-height: 1.2;">포스코DX</span>'
+            '<span style="font-size: 0.95rem; font-weight: 700; font-family: sans-serif; letter-spacing: 0.5px;"><span style="color: #C68A00;">AI</span> <span style="color: #555;">Native Company</span></span>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -273,19 +276,22 @@ if st.sidebar.button("🚪 로그아웃", type="secondary"):
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
-col_title, col_logo = st.columns([4, 2])
+col_title, col_logo = st.columns([3.5, 2.5])
 with col_title:
     st.markdown(
-        '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
+        '<p style="color: #64748B; font-size: 1.1rem; font-weight: 600; margin-bottom: 2px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
         unsafe_allow_html=True,
     )
-    st.title("⚡ PLC S/W 역량 진단 평가 시스템")
+    st.markdown(
+        '<h1 style="font-size: 2.3rem; font-weight: 800; padding-top: 0px; margin-top: 0px;">⚡ PLC S/W 역량 진단 평가 시스템</h1>',
+        unsafe_allow_html=True,
+    )
 with col_logo:
     st.markdown(
-        '<div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%; padding-top: 10px;">'
-        '<span style="font-size: 1.1rem; font-weight: 900; font-family: sans-serif; letter-spacing: 1px; color: #111; line-height: 1.1;">posco</span>'
-        '<span style="font-size: 1.4rem; font-weight: 900; font-family: sans-serif; letter-spacing: -0.5px; color: #111; line-height: 1.2;">포스코DX</span>'
-        '<span style="font-size: 0.75rem; font-weight: 700; font-family: sans-serif; letter-spacing: 0.5px;"><span style="color: #C68A00;">AI</span> <span style="color: #555;">Native Company</span></span>'
+        '<div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%; padding-top: 5px;">'
+        '<span style="font-size: 1.4rem; font-weight: 900; font-family: sans-serif; letter-spacing: 1px; color: #111; line-height: 1.1;">posco</span>'
+        '<span style="font-size: 1.8rem; font-weight: 900; font-family: sans-serif; letter-spacing: -0.5px; color: #111; line-height: 1.2;">포스코DX</span>'
+        '<span style="font-size: 0.95rem; font-weight: 700; font-family: sans-serif; letter-spacing: 0.5px;"><span style="color: #C68A00;">AI</span> <span style="color: #555;">Native Company</span></span>'
         '</div>',
         unsafe_allow_html=True,
     )
