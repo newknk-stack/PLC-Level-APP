@@ -171,10 +171,10 @@ TABLE_STYLE = """
         width: 100%;
         border-collapse: collapse;
         margin: 15px 0;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-family: sans-serif;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
-        border-radius: 5px;
+        border-radius: 6px;
         overflow: hidden;
     }
     .styled-table thead tr {
@@ -182,11 +182,13 @@ TABLE_STYLE = """
         color: #ffffff;
         text-align: center;
         font-weight: bold;
+        white-space: nowrap;
     }
     .styled-table th, .styled-table td {
         padding: 10px 12px;
         text-align: center;
-        border-bottom: 1px solid #dddddd;
+        border-bottom: 1px solid #e0e0e0;
+        white-space: nowrap;
     }
     .styled-table tbody tr:nth-of-type(even) {
         background-color: #f8f9fa;
@@ -532,7 +534,7 @@ with tab1:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
 # -------------------------------------------------------------------
-# TAB 2: 종합 평가 결과 대시보드 (수정 반영)
+# TAB 2: 종합 평가 결과 대시보드
 # -------------------------------------------------------------------
 with tab2:
     st.subheader("종합 평가 현황")
@@ -585,9 +587,6 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
-        # ---------------------------------------------------------------
-        # 🔄 정렬방식 선택 옵션 (요청 반영)
-        # ---------------------------------------------------------------
         sort_option = st.radio(
             "📌 **표 정렬 방식 선택**",
             ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
@@ -597,7 +596,6 @@ with tab2:
         if sort_option == "피평가자 이름순":
             summary_df.sort_values(by=["피평가자"], ascending=[True], inplace=True)
         else:
-            # 1우선: 종합 평균점수 내림차순(높은순), 2우선: 피평가자 이름 오름차순(가나다순)
             summary_df.sort_values(
                 by=["종합 평균점수", "피평가자"], ascending=[False, True], inplace=True
             )
