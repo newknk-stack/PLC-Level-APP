@@ -12,6 +12,101 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
+# 🎨 탭 및 테이블 디자인 커스텀 CSS
+# -------------------------------------------------------------------
+CUSTOM_STYLE = """
+<style>
+    /* 탭 네비게이션 컨테이너 스타일 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px;
+        background-color: #F1F5F9;
+        padding: 10px 15px;
+        border-radius: 12px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* 각 탭 버튼 스타일 */
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #FFFFFF;
+        border-radius: 8px;
+        gap: 8px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 20px;
+        padding-right: 20px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #475569;
+        border: 1px solid #CBD5E1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: all 0.2s ease-in-out;
+    }
+
+    /* 탭 마우스 호버 시 */
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #E2E8F0;
+        color: #1E293B;
+        border-color: #94A3B8;
+    }
+
+    /* 선택된 활성 탭 스타일 */
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100% !important;
+        color: #FFFFFF !important;
+        border-color: #0F172A !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 기존 테이블 스타일 */
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 0.85rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #E2E8F0;
+    }
+    .styled-table thead tr {
+        background-color: #1E293B;
+        color: #FFFFFF;
+        text-align: center;
+        font-weight: 600;
+        white-space: normal;
+        word-break: keep-all;
+        line-height: 1.3;
+    }
+    .styled-table th {
+        padding: 10px 8px;
+        text-align: center;
+        border-right: 1px solid #334155;
+    }
+    .styled-table th:last-child {
+        border-right: none;
+    }
+    .styled-table td {
+        padding: 8px 10px;
+        text-align: center;
+        border-bottom: 1px solid #E2E8F0;
+        color: #334155;
+        white-space: nowrap;
+    }
+    .styled-table tbody tr:nth-of-type(even) {
+        background-color: #F8FAFC;
+    }
+    .styled-table tbody tr:hover {
+        background-color: #EEF2FF;
+    }
+</style>
+"""
+
+st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
+
+# -------------------------------------------------------------------
 # 🍪 쿠키 매니저 및 로그인 세션 제어
 # -------------------------------------------------------------------
 cookie_manager = stx.CookieManager(key="cookie_manager")
@@ -165,53 +260,6 @@ def get_pre_grade(target_full_name):
     return "-"
 
 
-# 💡 가독성과 2줄 헤더 표시가 적용된 스타일 정의
-TABLE_STYLE = """
-<style>
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 10px 0;
-        font-size: 0.85rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        border-radius: 8px;
-        overflow: hidden;
-        border: 1px solid #E2E8F0;
-    }
-    .styled-table thead tr {
-        background-color: #1E293B;
-        color: #FFFFFF;
-        text-align: center;
-        font-weight: 600;
-        white-space: normal;
-        word-break: keep-all;
-        line-height: 1.3;
-    }
-    .styled-table th {
-        padding: 10px 8px;
-        text-align: center;
-        border-right: 1px solid #334155;
-    }
-    .styled-table th:last-child {
-        border-right: none;
-    }
-    .styled-table td {
-        padding: 8px 10px;
-        text-align: center;
-        border-bottom: 1px solid #E2E8F0;
-        color: #334155;
-        white-space: nowrap;
-    }
-    .styled-table tbody tr:nth-of-type(even) {
-        background-color: #F8FAFC;
-    }
-    .styled-table tbody tr:hover {
-        background-color: #EEF2FF;
-    }
-</style>
-"""
-
 # -------------------------------------------------------------------
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
@@ -347,12 +395,12 @@ def load_data():
 
 
 # -------------------------------------------------------------------
-# 📌 메인 탭 화면
+# 📌 메인 탭 화면 (가독성이 향상된 탭 적용)
 # -------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
-    "📝 평가 입력",
-    "📊 종합 평가 결과 대시보드",
-    "🔍 평가자별/대상자별 상세 조회",
+    "📝  평가 입력",
+    "📊  종합 평가 결과 대시보드",
+    "🔍  평가자별 / 대상자별 상세 조회",
 ])
 
 # -------------------------------------------------------------------
@@ -665,7 +713,23 @@ with tab2:
         html_table = summary_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
-        st.markdown(TABLE_STYLE + html_table, unsafe_allow_html=True)
+        # 테이블 스타일은 상단 공통 정의 사용
+        from __main__ import TABLE_STYLE if "TABLE_STYLE" in globals() else ""
+        table_css = """
+        <style>
+            .styled-table {
+                width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0;
+            }
+            .styled-table thead tr { background-color: #1E293B; color: #FFFFFF; text-align: center; font-weight: 600; line-height: 1.3; }
+            .styled-table th { padding: 10px 8px; text-align: center; border-right: 1px solid #334155; }
+            .styled-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #E2E8F0; color: #334155; white-space: nowrap; }
+            .styled-table tbody tr:nth-of-type(even) { background-color: #F8FAFC; }
+            .styled-table tbody tr:hover { background-color: #EEF2FF; }
+        </style>
+        """
+        st.markdown(table_css + html_table, unsafe_allow_html=True)
 
         st.markdown("### 🏆 등급 현황 통계")
         grade_series = pd.Series(raw_grades_list)
@@ -849,4 +913,4 @@ with tab3:
         html_filtered_table = filtered_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
-        st.markdown(TABLE_STYLE + html_filtered_table, unsafe_allow_html=True)
+        st.markdown(table_css + html_filtered_table, unsafe_allow_html=True)
