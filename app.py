@@ -126,6 +126,7 @@ df_comp = load_competency_data()
 # 🎨 등급 계산 및 HTML 색상 함수
 # -------------------------------------------------------------------
 def calculate_grade(total_score):
+    """10개 항목 합산 점수(100점 만점) 기준 등급 산정"""
     if total_score >= 90.0:
         return "S"
     elif total_score >= 80.0:
@@ -447,67 +448,17 @@ with tab1:
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
-    st.markdown(
-        """
-        <style>
-            div[data-testid="stSlider"] {
-                padding-bottom: 0px;
-            }
-            div[data-testid="stSlider"] [data-testid="stTickBar"] {
-                display: none;
-            }
-            .slider-tick-container {
-                display: flex;
-                justify-content: space-between;
-                position: relative;
-                top: -18px;
-                padding: 0 11px;
-                pointer-events: none;
-                margin-bottom: -10px;
-                z-index: 1;
-            }
-            .slider-tick-item {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                width: 14px;
-            }
-            .slider-tick-mark {
-                width: 1.5px;
-                height: 12px;
-                background-color: #a0a0a0;
-            }
-            .slider-tick-label {
-                font-size: 0.70rem;
-                color: #777777;
-                font-weight: 500;
-                margin-top: 4px;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
     scores = {}
+
     items_per_row = 2
-
-    ticks_html = '<div class="slider-tick-container">' + "".join([f'<div class="slider-tick-item"><div class="slider-tick-mark"></div><div class="slider-tick-label">{num}</div></div>' for num in range(11)]) + '</div>'
-
     for i in range(0, len(ITEMS), items_per_row):
         row_items = ITEMS[i : i + items_per_row]
         cols = st.columns(len(row_items))
-        
         for j, item in enumerate(row_items):
             with cols[j]:
                 scores[item] = st.slider(
-                    f"{item}", 
-                    min_value=0, 
-                    max_value=10, 
-                    value=5, 
-                    step=1,
-                    key=f"slide_{item}"
+                    f"{item}", 0, 10, 5, key=f"slide_{item}"
                 )
-                st.markdown(ticks_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -581,7 +532,7 @@ with tab1:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
 # -------------------------------------------------------------------
-# TAB 2: 종합 평가 결과 대시보드
+# TAB 2: 종합 평가 결과 대시보드 (수정 반영)
 # -------------------------------------------------------------------
 with tab2:
     st.subheader("종합 평가 현황")
@@ -634,6 +585,9 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
+        # ---------------------------------------------------------------
+        # 🔄 정렬방식 선택 옵션 (요청 반영)
+        # ---------------------------------------------------------------
         sort_option = st.radio(
             "📌 **표 정렬 방식 선택**",
             ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
@@ -643,6 +597,7 @@ with tab2:
         if sort_option == "피평가자 이름순":
             summary_df.sort_values(by=["피평가자"], ascending=[True], inplace=True)
         else:
+            # 1우선: 종합 평균점수 내림차순(높은순), 2우선: 피평가자 이름 오름차순(가나다순)
             summary_df.sort_values(
                 by=["종합 평균점수", "피평가자"], ascending=[False, True], inplace=True
             )
