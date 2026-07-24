@@ -12,7 +12,7 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭, 테이블 및 버튼 디자인 커스텀 CSS
+# 🎨 탭, 테이블 및 버튼 디자인 커스텀 CSS (더 연하고 은은한 소프트 블루 톤 적용)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
@@ -25,7 +25,7 @@ CUSTOM_STYLE = """
         border: 1px solid #E2E8F0;
     }
     
-    /* 각 탭 버튼 기본 스타일 */
+    /* 각 탭 버튼 기본 스타일 (부드러운 라운드 & 차분한 글자색) */
     .stTabs [data-baseweb="tab"] {
         height: 46px;
         white-space: pre-wrap;
@@ -40,12 +40,14 @@ CUSTOM_STYLE = """
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    /* 탭 마우스 호버 시 */
     .stTabs [data-baseweb="tab"]:hover {
         background-color: #F1F5F9;
         color: #334155;
         border-color: #CBD5E1;
     }
 
+    /* 선택된 활성 탭 스타일 (눈이 편안한 은은한 소프트 파스텔 블루 톤) */
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%) !important;
         color: #1E40AF !important;
@@ -54,10 +56,12 @@ CUSTOM_STYLE = """
         box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
     }
     
+    /* 스트림릿 기본 하단 인디케이터 제거 */
     .stTabs [data-baseweb="tab-highlight"] {
         display: none !important;
     }
 
+    /* 🎨 스트림릿 primary 버튼 스타일을 훨씬 더 옅고 부드러운 하늘색(Light Sky Blue)으로 커스텀 */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%) !important;
         color: #0369A1 !important;
@@ -73,6 +77,7 @@ CUSTOM_STYLE = """
         box-shadow: 0 4px 10px rgba(56, 189, 248, 0.35);
     }
 
+    /* 기존 테이블 스타일 */
     .styled-table {
         width: 100%;
         border-collapse: collapse;
@@ -131,12 +136,14 @@ if "user_name" not in st.session_state:
 if "logout_triggered" not in st.session_state:
     st.session_state["logout_triggered"] = False
 
+# 쿠키에서 로그인 정보 복원
 if not st.session_state["logged_in"] and not st.session_state["logout_triggered"]:
     saved_user = cookie_manager.get("logged_in_user")
     if saved_user:
         st.session_state["logged_in"] = True
         st.session_state["user_name"] = saved_user
 
+# 평가 항목 (10선) 및 평가자/대상자 기본 정의
 ITEMS = [
     "S/W 이해 및 제어 분석",
     "상위 인터페이스 분석",
@@ -184,7 +191,7 @@ TARGETS = sorted([
 
 
 # -------------------------------------------------------------------
-# 📊 데이터 파싱 함수
+# 📊 2026년 상반기 역량 진단 데이터 파싱 함수
 # -------------------------------------------------------------------
 @st.cache_data
 def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
@@ -221,13 +228,18 @@ def load_competency_data(excel_path="2026년 상반기 역량 진단표.xlsx"):
             })
         return pd.DataFrame(data)
     except Exception as e:
+        st.warning(f"사전 역량 진단표 파일 로드 중 참고용 데이터 오류: {e}")
         return pd.DataFrame()
 
 
 df_comp = load_competency_data()
 
 
+# -------------------------------------------------------------------
+# 🎨 등급 계산 및 HTML 색상 함수
+# -------------------------------------------------------------------
 def calculate_grade(total_score):
+    """10개 항목 합산 점수(100점 만점) 기준 등급 산정"""
     if total_score >= 90.0:
         return "S"
     elif total_score >= 80.0:
@@ -248,9 +260,12 @@ def get_colored_grade_html(est_grade, pre_grade):
         "C": "#D35400",
         "D": "#C0392B",
     }
+
     c_est = color_map.get(str(est_grade).strip()[0:1], "#333333")
     c_pre = color_map.get(str(pre_grade).strip()[0:1], "#333333")
-    return f'<span style="color: {c_est}; font-weight: bold;">{est_grade}</span> (<span style="color: {c_pre}; font-weight: bold;">{pre_grade}</span>)'
+
+    html_str = f'<span style="color: {c_est}; font-weight: bold;">{est_grade}</span> (<span style="color: {c_pre}; font-weight: bold;">{pre_grade}</span>)'
+    return html_str
 
 
 def get_pre_grade(target_full_name):
@@ -296,16 +311,20 @@ if not st.session_state["logged_in"]:
 
         if submit:
             correct_pw = st.secrets.get("common_password", "2026")
+
             if input_pw == str(correct_pw):
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user_name
                 st.session_state["logout_triggered"] = False
+
                 cookie_manager.set("logged_in_user", user_name, max_age=86400)
+
                 st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
                 time.sleep(0.3)
                 st.rerun()
             else:
                 st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
+
     st.stop()
 
 
@@ -319,6 +338,7 @@ if st.sidebar.button("🚪 로그아웃", type="secondary"):
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
     st.session_state["logout_triggered"] = True
+
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
@@ -353,17 +373,22 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive",
     ]
     creds_dict = dict(st.secrets["gcp_service_account"])
+
     if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace(
             "\\n", "\n"
         )
+
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    return gspread.authorize(creds)
+    client = gspread.authorize(creds)
+    return client
 
 
 def get_worksheet():
     client = get_gspread_client()
-    return client.open_by_url(st.secrets["private_gsheets_url"]).sheet1
+    sheet_url = st.secrets["private_gsheets_url"]
+    sheet = client.open_by_url(sheet_url).sheet1
+    return sheet
 
 
 @st.cache_data(ttl=15)
@@ -383,11 +408,12 @@ def load_data():
         if "429" in str(e):
             time.sleep(2)
             return load_data()
+        st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
 
 # -------------------------------------------------------------------
-# 📌 메인 탭 화면
+# 📌 메인 탭 화면 (소프트 파스텔 블루 톤 탭 적용)
 # -------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
     "📝  평가 입력",
@@ -396,12 +422,13 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력 (초기 슬라이더 드래그 방식)
+# TAB 1: 평가 점수 입력
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
 
     evaluator = st.session_state["user_name"]
+
     df_current = load_data()
     completed_targets = []
     if not df_current.empty and "evaluator" in df_current.columns and "target" in df_current.columns:
@@ -426,9 +453,11 @@ with tab1:
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
         match = df_comp[df_comp["이름"] == target_clean_name]
+
         if not match.empty:
             t_info = match.iloc[0]
             st.markdown("---")
+
             grade_badge = {
                 "S": "🟣 S등급 (최우수)",
                 "A": "🔵 A등급 (우수)",
@@ -440,6 +469,7 @@ with tab1:
             st.markdown(
                 f"##### 💡 **[{target}]** 님의 역량 본인 평가 참고 현황"
             )
+
             m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("역량 본인 평가", grade_badge)
             m2.metric(
@@ -464,19 +494,101 @@ with tab1:
                 delta_color="inverse",
             )
 
+            l0_p = t_info["L0_pct"]
+            l1_p = t_info["L1_pct"]
+            l2_p = t_info["L2_pct"]
+            l3_p = t_info["L3_pct"]
+
+            st.markdown(
+                f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
+                f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<span style='color: #888;'>Level 3(전문가): {l3_p}% &nbsp;|&nbsp; Level 2(우수/숙련): {l2_p}% &nbsp;|&nbsp; Level 1(보통/실전): {l1_p}% &nbsp;|&nbsp; Level 0(기초/미흡): {l0_p}%</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            raw_levels = [
+                ("Level 3", l3_p, "#5C5470", "white"),
+                ("Level 2", l2_p, "#7C83FD", "white"),
+                ("Level 1", l1_p, "#70A288", "white"),
+                ("Level 0", l0_p, "#D9B48F", "#333333"),
+            ]
+
+            active_levels = [item for item in raw_levels if item[1] > 0]
+
+            min_width = 8.0
+            chart_data = []
+
+            if active_levels:
+                visual_widths = [
+                    max(val, min_width) for _, val, _, _ in active_levels
+                ]
+                sum_v_w = sum(visual_widths)
+                norm_widths = [(w / sum_v_w) * 100 for w in visual_widths]
+
+                for (lbl, val, color, text_color), n_w in zip(
+                    active_levels, norm_widths
+                ):
+                    text_str = f"<b>{lbl} ({val}%)</b>"
+                    chart_data.append(
+                        (lbl, val, n_w, color, text_color, text_str)
+                    )
+
+            fig_bar = go.Figure()
+
+            for lbl, val, vis_w, color, text_color, text_str in chart_data:
+                fig_bar.add_trace(
+                    go.Bar(
+                        y=["분포"],
+                        x=[vis_w],
+                        name=lbl,
+                        orientation="h",
+                        marker=dict(color=color),
+                        text=text_str,
+                        textposition="inside",
+                        textfont=dict(
+                            color=text_color, size=12, family="sans-serif"
+                        ),
+                        hovertemplate=f"{lbl}: {val}%<extra></extra>",
+                    )
+                )
+
+            fig_bar.update_layout(
+                barmode="stack",
+                xaxis=dict(
+                    range=[0, 100],
+                    showgrid=False,
+                    showticklabels=False,
+                    zeroline=False,
+                ),
+                yaxis=dict(showgrid=False, showticklabels=False),
+                margin=dict(l=0, r=0, t=0, b=0),
+                height=32,
+                showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+
+            st.plotly_chart(
+                fig_bar,
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+
     st.markdown("---")
-    st.write("각 항목별 점수를 드래그하여 입력하세요 (0점 ~ 10점)")
+    st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
     scores = {}
-    items_per_row = 2
 
+    items_per_row = 2
     for i in range(0, len(ITEMS), items_per_row):
         row_items = ITEMS[i : i + items_per_row]
         cols = st.columns(len(row_items))
         for j, item in enumerate(row_items):
             with cols[j]:
-                score_val = st.slider(item, 0, 10, 5, key=f"slider_{item}")
-                scores[item] = score_val
+                scores[item] = st.slider(
+                    f"{item}", 0, 10, 5, key=f"slide_{item}"
+                )
 
     st.markdown("---")
 
@@ -487,7 +599,22 @@ with tab1:
         current_est_grade, current_pre_grade
     )
 
+    st.markdown(
+        """
+        <style>
+            div[data-testid="stColumn"]:nth-child(2) div.stButton > button {
+                height: 100% !important;
+                min-height: 72px !important;
+                font-size: 1.05rem !important;
+                font-weight: bold !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     btn_col1, btn_col2 = st.columns([1, 1])
+
     with btn_col1:
         st.markdown(
             f"""
@@ -508,6 +635,7 @@ with tab1:
         ):
             try:
                 df = load_data()
+
                 existing_idx = df[
                     (df["evaluator"] == evaluator) & (df["target"] == target)
                 ].index
@@ -524,7 +652,9 @@ with tab1:
                 sheet = get_worksheet()
                 sheet.clear()
                 sheet.update([df.columns.values.tolist()] + df.values.tolist())
+
                 st.cache_data.clear()
+
                 st.success(
                     f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 성공적으로 저장되었습니다!"
                 )
@@ -551,6 +681,7 @@ with tab2:
         for target_person in df["target"].unique():
             sub_df = df[df["target"] == target_person]
             eval_count = len(sub_df)
+            
             item_means = sub_df[ITEMS].mean()
             total_score = item_means.sum()
 
@@ -584,6 +715,7 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
+        # 🏆 등급 현황 통계를 맨 위로 이동
         st.markdown("### 🏆 등급 현황 통계")
         grade_series = pd.Series(raw_grades_list)
         grade_counts = grade_series.value_counts().reindex(
@@ -595,6 +727,7 @@ with tab2:
             eval(f"c{i+1}").metric(f"{g} 등급", f"{grade_counts[g]} 명")
 
         st.markdown("---")
+
         sort_option = st.radio(
             "📌 **표 정렬 방식 선택**",
             ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
@@ -617,9 +750,11 @@ with tab2:
         selected_target = st.selectbox(
             "분석할 대상자 선택", sorted(summary_df["피평가자"].unique())
         )
+
         target_info = summary_df[
             summary_df["피평가자"] == selected_target
         ].iloc[0]
+
         radar_df = pd.DataFrame(
             {"항목": ITEMS, "점수": [target_info[item] for item in ITEMS]}
         )
@@ -630,14 +765,20 @@ with tab2:
         fig.update_traces(fill="toself")
         st.plotly_chart(fig, use_container_width=True)
 
+        # -------------------------------------------------------------------
+        # 💡 평가 기반 장점 및 보완점 자동 요약 표출 영역
+        # -------------------------------------------------------------------
         st.markdown("---")
         st.markdown(f"#### 📝 **[{selected_target}] 역량 진단 요약 리포트**")
+
         item_scores_series = pd.Series({item: target_info[item] for item in ITEMS})
         sorted_scores = item_scores_series.sort_values(ascending=False)
+
         top_items = sorted_scores.head(3)
         bottom_items = sorted_scores.tail(3).sort_values(ascending=True)
 
         sum_col1, sum_col2 = st.columns(2)
+
         with sum_col1:
             st.success("##### 🌟 주요 강점 요약")
             strengths_text = ""
@@ -655,6 +796,7 @@ with tab2:
             st.markdown(weaknesses_text)
 
         st.markdown("---")
+
         st.download_button(
             label="📥 평가 집계 결과 엑셀(CSV) 다운로드",
             data=download_df.to_csv(index=False).encode("utf-8-sig"),
@@ -670,8 +812,10 @@ with tab3:
     df = load_data()
 
     filter_col1, filter_col2 = st.columns(2)
+
     evaluator_list = ["전체"] + EVALUATORS
     target_list = ["전체"] + TARGETS
+
     default_eval_idx = (
         evaluator_list.index(st.session_state["user_name"])
         if st.session_state["user_name"] in evaluator_list
@@ -694,6 +838,7 @@ with tab3:
         not_evaluated_targets = [
             t for t in TARGETS if t not in evaluated_targets
         ]
+
         st.markdown("---")
         m_col1, m_col2 = st.columns(2)
         m_col1.metric(
@@ -701,6 +846,23 @@ with tab3:
             f"{len(evaluated_targets)} / {len(TARGETS)} 명",
         )
         m_col2.metric("남은 미평가 인원", f"{len(not_evaluated_targets)} 명")
+
+        if not_evaluated_targets:
+            with st.expander(
+                f"⚠️ [{sel_evaluator}] 평가자가 아직 평가하지 않은 대상자 목록 ({len(not_evaluated_targets)}명)",
+                expanded=True,
+            ):
+                cols_per_row = 4
+                for i in range(0, len(not_evaluated_targets), cols_per_row):
+                    cols = st.columns(cols_per_row)
+                    for j, target_name in enumerate(
+                        not_evaluated_targets[i : i + cols_per_row]
+                    ):
+                        cols[j].write(f"• {target_name}")
+        else:
+            st.success(
+                f"🎉 [{sel_evaluator}] 평가자는 모든 대상자에 대한 평가를 완료했습니다!"
+            )
         st.markdown("---")
 
     if df.empty or len(df) == 0:
@@ -714,6 +876,7 @@ with tab3:
             columns={"evaluator": "평가자", "target": "평가 대상자"},
             inplace=True,
         )
+
         display_df["합산 점수"] = display_df[ITEMS].sum(axis=1).round(1)
         for item in ITEMS:
             display_df[item] = display_df[item].round(1)
@@ -724,6 +887,7 @@ with tab3:
         display_df["_temp_pre_grade"] = display_df["평가 대상자"].apply(
             get_pre_grade
         )
+
         display_df["기술 평가 등급(역량 본인 평가)"] = display_df.apply(
             lambda r: get_colored_grade_html(
                 r["_temp_est_grade"], r["_temp_pre_grade"]
@@ -740,14 +904,17 @@ with tab3:
         display_df = display_df[column_order]
 
         filtered_df = display_df.copy()
+
         if sel_evaluator != "전체":
             filtered_df = filtered_df[filtered_df["평가자"] == sel_evaluator]
+
         if sel_target != "전체":
             filtered_df = filtered_df[filtered_df["평가 대상자"] == sel_target]
 
         st.markdown(
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
         )
+
         html_filtered_table = filtered_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
