@@ -170,8 +170,8 @@ TABLE_STYLE = """
     .styled-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 15px 0;
-        font-size: 0.9rem;
+        margin: 10px 0;
+        font-size: 0.8rem;
         font-family: sans-serif;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
         border-radius: 6px;
@@ -185,7 +185,7 @@ TABLE_STYLE = """
         white-space: nowrap;
     }
     .styled-table th, .styled-table td {
-        padding: 10px 12px;
+        padding: 6px 8px;
         text-align: center;
         border-bottom: 1px solid #e0e0e0;
         white-space: nowrap;
