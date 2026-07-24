@@ -469,7 +469,7 @@ with tab1:
         current_est_grade, current_pre_grade
     )
 
-    # 💡 제출 버튼 세로 높이를 왼쪽 박스 높이와 맞추기 위한 CSS 추가
+    # 제출 버튼 세로 높이 맞춤 CSS
     st.markdown(
         """
         <style>
@@ -489,11 +489,11 @@ with tab1:
     with btn_col1:
         st.markdown(
             f"""
-            <div style="background-color: #f8f9fa; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; height: 100%; min-height: 72px; display: flex; flex-direction: column; justify-content: center;">
-                <div>
-                    <span style="font-size: 0.95rem; color: #555;">기술평가 등급(사전):</span><br>
-                    <span style="font-size: 1.25rem;">{colored_grade_display}</span>
-                    <span style="font-size: 0.9rem; color: #888;"> (평균 {current_avg:.1f}점)</span>
+            <div style="background-color: #f8f9fa; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
+                <div style="white-space: nowrap;">
+                    <span style="font-size: 0.95rem; color: #555; margin-right: 8px;">기술평가 등급(사전):</span>
+                    <span style="font-size: 1.2rem;">{colored_grade_display}</span>
+                    <span style="font-size: 0.9rem; color: #888; margin-left: 4px;">(평균 {current_avg:.1f}점)</span>
                 </div>
             </div>
             """,
