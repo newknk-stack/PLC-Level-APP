@@ -261,7 +261,6 @@ if st.sidebar.button("🚪 로그아웃", type="secondary"):
     cookie_manager.delete("logged_in_user")
     st.rerun()
 
-# 메인 화면 상단 조직명 문구 및 타이틀 추가
 st.markdown(
     '<p style="color: #64748B; font-size: 0.95rem; font-weight: 600; margin-bottom: 0px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
     unsafe_allow_html=True,
@@ -373,11 +372,11 @@ with tab1:
             }.get(t_info["등급"], f"{t_info['등급']} 등급")
 
             st.markdown(
-                f"##### 💡 **[{target}]** 님의 사전 역량 진단 참고 현황"
+                f"##### 💡 **[{target}]** 님의 사전 자기 평가 참고 현황"
             )
 
             m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("사전 진단 등급", grade_badge)
+            m1.metric("사전 자기 평가", grade_badge)
             m2.metric(
                 "Level 3 (전문가 건수)",
                 f"{t_info['L3_cnt']}건",
@@ -526,7 +525,7 @@ with tab1:
             f"""
             <div style="background-color: #f8f9fa; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
                 <div style="white-space: nowrap;">
-                    <span style="font-size: 0.95rem; color: #555; margin-right: 8px;">기술평가 등급(사전):</span>
+                    <span style="font-size: 0.95rem; color: #555; margin-right: 8px;">기술평가 등급(사전 자기 평가):</span>
                     <span style="font-size: 1.2rem;">{colored_grade_display}</span>
                     <span style="font-size: 0.9rem; color: #888; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
                 </div>
@@ -601,13 +600,13 @@ with tab2:
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_score, 1),
-                "기술 평가 등급(사전)": colored_grade_html,
+                "기술 평가 등급(사전 자기 평가)": colored_grade_html,
             }
             row_dl = {
                 "피평가자": target_person,
                 "평가인원": eval_count,
                 "종합 평균점수": round(total_score, 1),
-                "기술 평가 등급(사전)": f"{est_grade} ({pre_grade})",
+                "기술 평가 등급(사전 자기 평가)": f"{est_grade} ({pre_grade})",
             }
 
             for item in ITEMS:
@@ -791,7 +790,7 @@ with tab3:
             get_pre_grade
         )
 
-        display_df["기술 평가 등급(사전)"] = display_df.apply(
+        display_df["기술 평가 등급(사전 자기 평가)"] = display_df.apply(
             lambda r: get_colored_grade_html(
                 r["_temp_est_grade"], r["_temp_pre_grade"]
             ),
@@ -801,7 +800,7 @@ with tab3:
         column_order = [
             "평가자",
             "평가 대상자",
-            "기술 평가 등급(사전)",
+            "기술 평가 등급(사전 자기 평가)",
             "합산 점수",
         ] + ITEMS
         display_df = display_df[column_order]
