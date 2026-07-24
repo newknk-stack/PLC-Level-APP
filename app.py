@@ -343,25 +343,26 @@ with tab1:
                 f"##### 💡 **[{target}]** 님의 사전 역량 진단 참고 현황"
             )
 
+            # ✨ [수정 완료] 지표명 요구사항에 맞춰 일괄 변경
             m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("사전 진단 등급", grade_badge)
             m2.metric(
-                "Level 3 (전문가)",
+                "Level 3 (난이도 최상 S/W 이해 건수)",
                 f"{t_info['L3_cnt']}건",
                 f"{t_info['L3_pct']}%",
             )
             m3.metric(
-                "Level 2 (우수/숙련)",
+                "Level 2 (난이도 상 S/W 이해 건수)",
                 f"{t_info['L2_cnt']}건",
                 f"{t_info['L2_pct']}%",
             )
             m4.metric(
-                "Level 1 (보통/실무)",
+                "Level 1 (난이도 중 S/W 이해 건수)",
                 f"{t_info['L1_cnt']}건",
                 f"{t_info['L1_pct']}%",
             )
             m5.metric(
-                "Level 0 (기초/미흡)",
+                "Level 0 (난이도 하 S/W 이해 건수)",
                 f"{t_info['L0_cnt']}건",
                 f"{t_info['L0_pct']}%",
                 delta_color="inverse",
@@ -371,7 +372,7 @@ with tab1:
             high_level_pct = int(t_info["L3_pct"] + t_info["L2_pct"])
             st.progress(
                 high_level_pct,
-                text=f"L3(전문): {t_info['L3_pct']}% | L2(우수): {t_info['L2_pct']}% | L1(실무): {t_info['L1_pct']}% | L0(기초): {t_info['L0_pct']}%",
+                text=f"L3(최상): {t_info['L3_pct']}% | L2(상): {t_info['L2_pct']}% | L1(중): {t_info['L1_pct']}% | L0(하): {t_info['L0_pct']}%",
             )
 
     st.markdown("---")
@@ -392,9 +393,7 @@ with tab1:
 
     st.markdown("---")
 
-    # -------------------------------------------------------------------
-    # ✨ [수정] 제출 버튼 영역: 현재 입력된 점수 기준 등급 계산 & 버튼 왼쪽 표출
-    # -------------------------------------------------------------------
+    # 제출 버튼 영역 (현재 입력 점수 기준 기술평가 등급 표출)
     current_avg = np.mean(list(scores.values())) if scores else 0.0
     current_est_grade = calculate_grade(current_avg)
     current_pre_grade = get_pre_grade(target)
