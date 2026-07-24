@@ -12,7 +12,7 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭, 테이블 및 버튼 디자인 커스텀 CSS (은은하고 옅은 소프트 블루 톤 적용)
+# 🎨 탭, 테이블 및 버튼 디자인 커스텀 CSS (더 연하고 은은한 소프트 블루 톤 적용)
 # -------------------------------------------------------------------
 CUSTOM_STYLE = """
 <style>
@@ -61,19 +61,20 @@ CUSTOM_STYLE = """
         display: none !important;
     }
 
-    /* 🎨 스트림릿 primary 버튼 스타일을 부드러운 하늘색(Soft Sky Blue)으로 커스텀 */
+    /* 🎨 스트림릿 primary 버튼 스타일을 훨씬 더 옅고 부드러운 하늘색(Light Sky Blue)으로 커스텀 */
     div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
-        color: #FFFFFF !important;
-        border: 1px solid #2563EB !important;
+        background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%) !important;
+        color: #0369A1 !important;
+        border: 1px solid #7DD3FC !important;
         border-radius: 10px !important;
-        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+        box-shadow: 0 2px 6px rgba(125, 211, 252, 0.25);
         transition: all 0.2s ease-in-out;
     }
     div.stButton > button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
-        border-color: #1D4ED8 !important;
-        box-shadow: 0 6px 14px rgba(59, 130, 246, 0.35);
+        background: linear-gradient(135deg, #BAE6FD 0%, #7DD3FC 100%) !important;
+        color: #0C4A6E !important;
+        border-color: #38BDF8 !important;
+        box-shadow: 0 4px 10px rgba(56, 189, 248, 0.35);
     }
 
     /* 기존 테이블 스타일 */
