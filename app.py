@@ -396,7 +396,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력 (드래그 슬라이더 방식 적용)
+# TAB 1: 평가 점수 입력 (초기 슬라이더 드래그 방식)
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
@@ -475,34 +475,8 @@ with tab1:
         cols = st.columns(len(row_items))
         for j, item in enumerate(row_items):
             with cols[j]:
-                score_val = st.slider(
-                    f"{item}", 
-                    min_value=0, 
-                    max_value=10, 
-                    value=5, 
-                    step=1, 
-                    key=f"slider_{item}"
-                )
+                score_val = st.slider(item, 0, 10, 5, key=f"slider_{item}")
                 scores[item] = score_val
-
-                # 신호등 체계 색상 매핑
-                if score_val <= 4:
-                    bar_color = "#F9A826"  # 주황
-                elif score_val <= 7:
-                    bar_color = "#66BB6A"  # 녹색
-                else:
-                    bar_color = "#42A5F5"  # 파랑
-
-                # 하단 컬러 게이지 바 연동
-                pct = int(score_val * 10)
-                st.markdown(
-                    f"""
-                    <div style="background-color: #E2E8F0; border-radius: 4px; width: 100%; height: 8px; margin-top: -6px; margin-bottom: 20px; overflow: hidden;">
-                        <div style="background-color: {bar_color}; width: {pct}%; height: 100%; transition: width 0.2s ease;"></div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
 
     st.markdown("---")
 
