@@ -12,11 +12,10 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🍪 쿠키 매니저 및 로그인 세션 제어
+# 🍪 쿠키 매니저 및 로그인 세션 제어 (중복 렌더링 방지 처리)
 # -------------------------------------------------------------------
-cookie_manager = stx.CookieManager()
+cookie_manager = stx.CookieManager(key="cookie_manager")
 
-# 세션 상태 초기화
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "user_name" not in st.session_state:
@@ -24,9 +23,9 @@ if "user_name" not in st.session_state:
 if "logout_triggered" not in st.session_state:
     st.session_state["logout_triggered"] = False
 
-# 브라우저 쿠키 확인 (로그아웃 버튼을 누르지 않은 경우)
+# 쿠키에서 로그인 정보 복원 (로그아웃 버튼을 누르지 않은 경우에만)
 if not st.session_state["logged_in"] and not st.session_state["logout_triggered"]:
-    saved_user = cookie_manager.get(cookie="logged_in_user")
+    saved_user = cookie_manager.get("logged_in_user")
     if saved_user:
         st.session_state["logged_in"] = True
         st.session_state["user_name"] = saved_user
@@ -47,7 +46,6 @@ ITEMS = [
 
 EVALUATORS = ["정준영", "차영진", "김태환", "김남권", "최치웅"]
 
-# 가나다순 정렬된 평가 대상자 목록
 TARGETS = sorted([
     "박상규 CL4",
     "이영표 CL4",
@@ -199,7 +197,7 @@ TABLE_STYLE = """
 """
 
 # -------------------------------------------------------------------
-# 🔐 로그인 처리 (미로그인 시 메인 앱 실행 차단)
+# 🔐 로그인 화면 (완전 격리 처리)
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
     st.title("🔐 PLC S/W 역량 진단 평가 시스템")
@@ -226,12 +224,12 @@ if not st.session_state["logged_in"]:
             else:
                 st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
 
-    # 미로그인 상태 시 여기서 스크립트 실행 중단 (아래 메인 코드 실행 방지)
+    # 로그인 안 되었을 시 아래 메인 앱 화면 코드가 절대 실행되지 않도록 확실하게 중단
     st.stop()
 
 
 # -------------------------------------------------------------------
-# 👤 사이드바 (로그인 성공 시에만 노출)
+# 👤 사이드바 (로그인 완료 후에만 렌더링)
 # -------------------------------------------------------------------
 st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
@@ -248,7 +246,7 @@ st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
-# ☁️ 구글 시트 연동 설정
+# ☁️ 구글 시트 연동 설정 (안전한 캐시 제어)
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_gspread_client():
@@ -275,8 +273,7 @@ def get_worksheet():
     return sheet
 
 
-# API 초과 방지를 위한 10초 캐시
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=15)
 def load_data():
     try:
         sheet = get_worksheet()
@@ -291,13 +288,15 @@ def load_data():
         return df
     except Exception as e:
         if "429" in str(e):
-            time.sleep(3)
+            time.sleep(2)
             return load_data()
         st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
 
-# 탭 구성
+# -------------------------------------------------------------------
+# 📌 메인 탭 화면
+# -------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
     "📝 평가 입력",
     "📊 종합 평가 결과 대시보드",
@@ -365,7 +364,6 @@ with tab1:
                 delta_color="inverse",
             )
 
-            # 역량 수준별 비중 값
             l0_p = t_info["L0_pct"]
             l1_p = t_info["L1_pct"]
             l2_p = t_info["L2_pct"]
@@ -471,7 +469,6 @@ with tab1:
         current_est_grade, current_pre_grade
     )
 
-    # 제출 버튼 세로 높이 맞춤 CSS
     st.markdown(
         """
         <style>
