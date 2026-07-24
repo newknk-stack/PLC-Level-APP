@@ -53,7 +53,7 @@ CUSTOM_STYLE = """
 
     /* 선택된 활성 탭 스타일 */
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100% !important;
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100% !important);
         color: #FFFFFF !important;
         border-color: #0F172A !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
@@ -713,23 +713,7 @@ with tab2:
         html_table = summary_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
-        # 테이블 스타일은 상단 공통 정의 사용
-        from __main__ import TABLE_STYLE if "TABLE_STYLE" in globals() else ""
-        table_css = """
-        <style>
-            .styled-table {
-                width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0;
-            }
-            .styled-table thead tr { background-color: #1E293B; color: #FFFFFF; text-align: center; font-weight: 600; line-height: 1.3; }
-            .styled-table th { padding: 10px 8px; text-align: center; border-right: 1px solid #334155; }
-            .styled-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #E2E8F0; color: #334155; white-space: nowrap; }
-            .styled-table tbody tr:nth-of-type(even) { background-color: #F8FAFC; }
-            .styled-table tbody tr:hover { background-color: #EEF2FF; }
-        </style>
-        """
-        st.markdown(table_css + html_table, unsafe_allow_html=True)
+        st.markdown(CUSTOM_STYLE + html_table, unsafe_allow_html=True)
 
         st.markdown("### 🏆 등급 현황 통계")
         grade_series = pd.Series(raw_grades_list)
@@ -913,4 +897,4 @@ with tab3:
         html_filtered_table = filtered_df.to_html(
             index=False, escape=False, classes="styled-table"
         )
-        st.markdown(table_css + html_filtered_table, unsafe_allow_html=True)
+        st.markdown(CUSTOM_STYLE + html_filtered_table, unsafe_allow_html=True)
