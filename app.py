@@ -367,7 +367,7 @@ with tab1:
             l2_p = t_info["L2_pct"]
             l3_p = t_info["L3_pct"]
 
-            # ✨ 타이틀 옆에 안내 텍스트 배치
+            # 타이틀 옆에 안내 텍스트 배치
             st.markdown(
                 f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
                 f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
@@ -376,15 +376,15 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-            # 1. 눈이 편안한 파스텔 톤 색상 조합 (L3 -> L2 -> L1 -> L0 순서)
+            # 소프트 파스텔 톤 색상 조합 (L3 -> L2 -> L1 -> L0 순서)
             raw_levels = [
-                ("L3", l3_p, "#5C5470", "white"),    # 소프트 다크 톤
-                ("L2", l2_p, "#7C83FD", "white"),    # 파스텔 퍼플
-                ("L1", l1_p, "#70A288", "white"),    # 파스텔 민트/세이지
-                ("L0", l0_p, "#D9B48F", "#333333"),  # 파스텔 베이지
+                ("L3", l3_p, "#5C5470", "white"),
+                ("L2", l2_p, "#7C83FD", "white"),
+                ("L1", l1_p, "#70A288", "white"),
+                ("L0", l0_p, "#D9B48F", "#333333"),
             ]
 
-            # 2. 텍스트 가독성을 위한 최소 너비 보정
+            # 텍스트 가독성을 위한 최소 너비 보정
             active_levels = [item for item in raw_levels if item[1] > 0]
 
             min_width = 8.0
@@ -405,7 +405,7 @@ with tab1:
                         (lbl, val, n_w, color, text_color, text_str)
                     )
 
-            # 3. Plotly 막대 차트 생성
+            # Plotly 막대 차트 생성 (모서리 둥글게 적용)
             fig_bar = go.Figure()
 
             for lbl, val, vis_w, color, text_color, text_str in chart_data:
@@ -415,7 +415,10 @@ with tab1:
                         x=[vis_w],
                         name=lbl,
                         orientation="h",
-                        marker=dict(color=color),
+                        marker=dict(
+                            color=color,
+                            cornerradius=10  # ✨ 모서리를 둥글게 만들어 주는 옵션
+                        ),
                         text=text_str,
                         textposition="inside",
                         textfont=dict(
@@ -471,7 +474,6 @@ with tab1:
         current_est_grade, current_pre_grade
     )
 
-    # 5:5 비율([1, 1]) 칼럼
     btn_col1, btn_col2 = st.columns([1, 1])
 
     with btn_col1:
