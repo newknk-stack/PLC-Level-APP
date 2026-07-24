@@ -328,13 +328,29 @@ with tab1:
 
     evaluator = st.session_state["user_name"]
 
+    # 현재 로그인한 평가자가 이미 평가를 완료한 대상자 목록 추출
+    df_current = load_data()
+    completed_targets = []
+    if not df_current.empty and "evaluator" in df_current.columns and "target" in df_current.columns:
+        completed_targets = df_current[df_current["evaluator"] == evaluator]["target"].tolist()
+
+    # 대상자 셀렉트박스 목록 생성 (평가 완료된 대상자에게 표시 추가)
+    display_targets = []
+    for t in TARGETS:
+        if t in completed_targets:
+            display_targets.append(f"{t}  (✅ 평가 완료)")
+        else:
+            display_targets.append(t)
+
     col1, col2 = st.columns(2)
     with col1:
         st.text_input(
             "평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True
         )
     with col2:
-        target = st.selectbox("평가 대상자 선택", TARGETS)
+        selected_display_target = st.selectbox("평가 대상자 선택", display_targets)
+        # 선택된 값에서 ' (✅ 평가 완료)' 문자열 제거하여 원본 대상자 이름 복원
+        target = selected_display_target.replace("  (✅ 평가 완료)", "")
 
     # 사전 역량 진단 참고 정보 표출
     if target and not df_comp.empty:
