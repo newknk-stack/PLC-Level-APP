@@ -304,7 +304,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력
+# TAB 1: 평가 점수 입력 (슬라이더 눈금/경계선 추가)
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
@@ -448,16 +448,65 @@ with tab1:
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
-    scores = {}
+    # 🎨 슬라이더 하단 눈금선 및 라벨 스타일 정의
+    st.markdown(
+        """
+        <style>
+            .stSlider {
+                margin-bottom: -10px;
+            }
+            .slider-ticks {
+                display: flex;
+                justify-content: space-between;
+                padding: 0 6px;
+                margin-top: -12px;
+                margin-bottom: 20px;
+                font-size: 0.72rem;
+                color: #777777;
+                font-weight: 500;
+            }
+            .slider-ticks span {
+                text-align: center;
+                width: 18px;
+            }
+            .slider-ticks span::before {
+                content: '|';
+                display: block;
+                font-size: 0.65rem;
+                color: #bbb;
+                margin-bottom: -2px;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    scores = {}
     items_per_row = 2
+
     for i in range(0, len(ITEMS), items_per_row):
         row_items = ITEMS[i : i + items_per_row]
         cols = st.columns(len(row_items))
+        
         for j, item in enumerate(row_items):
             with cols[j]:
                 scores[item] = st.slider(
-                    f"{item}", 0, 10, 5, key=f"slide_{item}"
+                    f"{item}", 
+                    min_value=0, 
+                    max_value=10, 
+                    value=5, 
+                    step=1,
+                    key=f"slide_{item}"
+                )
+                # 눈금 라벨 출력
+                st.markdown(
+                    """
+                    <div class="slider-ticks">
+                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                        <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
 
     st.markdown("---")
@@ -532,7 +581,7 @@ with tab1:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
 # -------------------------------------------------------------------
-# TAB 2: 종합 평가 결과 대시보드 (수정 반영)
+# TAB 2: 종합 평가 결과 대시보드 (정렬 기능 적용)
 # -------------------------------------------------------------------
 with tab2:
     st.subheader("종합 평가 현황")
@@ -585,9 +634,7 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
-        # ---------------------------------------------------------------
-        # 🔄 정렬방식 선택 옵션 (요청 반영)
-        # ---------------------------------------------------------------
+        # 🔄 정렬방식 선택
         sort_option = st.radio(
             "📌 **표 정렬 방식 선택**",
             ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
@@ -597,7 +644,6 @@ with tab2:
         if sort_option == "피평가자 이름순":
             summary_df.sort_values(by=["피평가자"], ascending=[True], inplace=True)
         else:
-            # 1우선: 종합 평균점수 내림차순(높은순), 2우선: 피평가자 이름 오름차순(가나다순)
             summary_df.sort_values(
                 by=["종합 평균점수", "피평가자"], ascending=[False, True], inplace=True
             )
