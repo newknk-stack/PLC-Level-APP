@@ -304,7 +304,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력 (그래프 내부 눈금선 수정)
+# TAB 1: 평가 점수 입력 (눈금선 바 중첩 & 숫자는 하단 표시)
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
@@ -448,39 +448,52 @@ with tab1:
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
-    # 🎨 슬라이더 그래프 선 안쪽(내부) 눈금선 및 라벨 스타일
+    # 🎨 눈금선 바 중첩 & 숫자는 하단에 배치하는 CSS 스타일
     st.markdown(
         """
         <style>
-            /* 슬라이더 바 내부 수직 위치 조절 */
+            /* 슬라이더 영역 여백 잡기 */
             div[data-testid="stSlider"] {
                 padding-bottom: 0px;
             }
-            .slider-in-ticks {
+            
+            /* 기본 하단 min/max 텍스트 가리기 */
+            div[data-testid="stSlider"] [data-testid="stTickBar"] {
+                display: none;
+            }
+
+            /* 슬라이더 트랙과 중첩되는 눈금선 및 아래쪽 숫자를 만드는 레이어 */
+            .slider-tick-container {
                 display: flex;
                 justify-content: space-between;
                 position: relative;
-                top: 26px; /* 트랙 안으로 눈금선 레이어 배치 */
-                z-index: 2;
-                pointer-events: none;
+                top: -18px; /* 바와 눈금선 수직 중첩 위치 */
                 padding: 0 11px;
-                margin-bottom: -16px;
+                pointer-events: none;
+                margin-bottom: -10px;
+                z-index: 1;
             }
-            .slider-in-ticks span {
-                font-size: 0.68rem;
-                color: #888888;
-                font-weight: 600;
-                text-align: center;
+
+            .slider-tick-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
                 width: 14px;
-                line-height: 1;
             }
-            .slider-in-ticks span::after {
-                content: '';
-                display: block;
-                width: 1px;
-                height: 6px;
-                background-color: #aaaaaa;
-                margin: 2px auto 0 auto;
+
+            /* 바와 수직으로 중첩(교차)되는 눈금선 */
+            .slider-tick-mark {
+                width: 1.5px;
+                height: 12px; /* 바 위아래로 교차되도록 높이 지정 */
+                background-color: #a0a0a0;
+            }
+
+            /* 눈금선 바로 밑에 표시될 숫자 */
+            .slider-tick-label {
+                font-size: 0.70rem;
+                color: #777777;
+                font-weight: 500;
+                margin-top: 4px; /* 눈금선과 숫자 사이 간격 */
             }
         </style>
         """,
@@ -490,23 +503,25 @@ with tab1:
     scores = {}
     items_per_row = 2
 
+    # 눈금 및 숫자를 동적으로 생성하는 HTML 템플릿
+    ticks_html = """
+    <div class="slider-tick-container">
+    """ + "".join([f"""
+        <div class="slider-tick-item">
+            <div class="slider-tick-mark"></div>
+            <div class="slider-tick-label">{num}</div>
+        </div>
+    """ for num in range(11)]) + """
+    </div>
+    """
+
     for i in range(0, len(ITEMS), items_per_row):
         row_items = ITEMS[i : i + items_per_row]
         cols = st.columns(len(row_items))
         
         for j, item in enumerate(row_items):
             with cols[j]:
-                # 트랙 내부 눈금선 HTML 삽입
-                st.markdown(
-                    """
-                    <div class="slider-in-ticks">
-                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
-                        <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                
+                # 1. 슬라이더 바 배치
                 scores[item] = st.slider(
                     f"{item}", 
                     min_value=0, 
@@ -515,6 +530,9 @@ with tab1:
                     step=1,
                     key=f"slide_{item}"
                 )
+                
+                # 2. 바에 중첩되는 눈금선 및 하단 숫자 HTML 배치
+                st.markdown(ticks_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
