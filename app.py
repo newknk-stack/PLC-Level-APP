@@ -507,49 +507,59 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-            raw_levels = [
-                ("Level 3", l3_p, "#5C5470", "white"),
-                ("Level 2", l2_p, "#7C83FD", "white"),
-                ("Level 1", l1_p, "#70A288", "white"),
-                ("Level 0", l0_p, "#D9B48F", "#333333"),
+            # 🎨 신호등 체계 색상 매핑 함수 (추천 1 적용)
+            def get_level_color_and_text(score):
+                if score <= 4.5:
+                    return "#F9A826", "white"  # 주황 (낮음)
+                elif score <= 7.5:
+                    return "#66BB6A", "white"  # 녹색 (보통)
+                else:
+                    return "#42A5F5", "white"  # 파랑 (높음)
+
+            levels_data = [
+                ("Level 3", l3_p, l3_p / 10.0),
+                ("Level 2", l2_p, l2_p / 10.0),
+                ("Level 1", l1_p, l1_p / 10.0),
+                ("Level 0", l0_p, l0_p / 10.0),
             ]
 
-            active_levels = [item for item in raw_levels if item[1] > 0]
+            active_levels = [item for item in levels_data if item[1] > 0]
 
             min_width = 8.0
             chart_data = []
 
             if active_levels:
                 visual_widths = [
-                    max(val, min_width) for _, val, _, _ in active_levels
+                    max(val, min_width) for _, val, _ in active_levels
                 ]
                 sum_v_w = sum(visual_widths)
                 norm_widths = [(w / sum_v_w) * 100 for w in visual_widths]
 
-                for (lbl, val, color, text_color), n_w in zip(
+                for (lbl, pct, score), n_w in zip(
                     active_levels, norm_widths
                 ):
-                    text_str = f"<b>{lbl} ({val}%)</b>"
+                    bar_color, text_color = get_level_color_and_text(score)
+                    text_str = f"<b>{lbl} ({pct}%)</b>"
                     chart_data.append(
-                        (lbl, val, n_w, color, text_color, text_str)
+                        (lbl, pct, n_w, bar_color, text_color, text_str)
                     )
 
             fig_bar = go.Figure()
 
-            for lbl, val, vis_w, color, text_color, text_str in chart_data:
+            for lbl, pct, vis_w, color, text_color, text_str in chart_data:
                 fig_bar.add_trace(
                     go.Bar(
                         y=["분포"],
                         x=[vis_w],
                         name=lbl,
                         orientation="h",
-                        marker=dict(color=color),
+                        marker=dict(color=color, line=dict(color="white", width=1)),
                         text=text_str,
                         textposition="inside",
                         textfont=dict(
                             color=text_color, size=12, family="sans-serif"
                         ),
-                        hovertemplate=f"{lbl}: {val}%<extra></extra>",
+                        hovertemplate=f"{lbl}: {pct}%<extra></extra>",
                     )
                 )
 
