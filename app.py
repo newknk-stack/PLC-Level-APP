@@ -49,7 +49,7 @@ ITEMS = [
 
 EVALUATORS = ["정준영", "차영진", "김태환", "김남권", "최치웅"]
 
-# ✨ [수정 완료] 가나다순으로 정렬된 대상자 목록
+# 가나다순 정렬된 평가 대상자 목록
 TARGETS = sorted([
     "박상규 CL4",
     "이영표 CL4",
@@ -221,7 +221,7 @@ if not st.session_state["logged_in"]:
                 st.session_state["user_name"] = user_name
                 st.session_state[
                     "logout_triggered"
-                ] = False  # ✨ 로그인 성공 시 로그아웃 플래그 초기화
+                ] = False  # 로그인 성공 시 로그아웃 플래그 초기화
 
                 # 쿠키에 1일(86400초) 간 저장
                 cookie_manager.set("logged_in_user", user_name, max_age=86400)
@@ -241,7 +241,7 @@ st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
-    # 1. 세션 상태 즉시 초기화 + 로그아웃 플래그 설정 (자동 로그인 차단)
+    # 1. 세션 상태 즉시 초기화 + 로그아웃 플래그 설정
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
     st.session_state["logout_triggered"] = True
@@ -291,7 +291,6 @@ def load_data():
         if df.empty:
             df = pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
         else:
-            # KeyError 방지: 새로운 항목 컬럼이 없을 경우 기본값 0 추가
             for item in ITEMS:
                 if item not in df.columns:
                     df[item] = 0
@@ -369,12 +368,41 @@ with tab1:
                 delta_color="inverse",
             )
 
-            st.caption("역량 수준별 분포 현황")
-            high_level_pct = int(t_info["L3_pct"] + t_info["L2_pct"])
-            st.progress(
-                high_level_pct,
-                text=f"L3(최상): {t_info['L3_pct']}% | L2(상): {t_info['L2_pct']}% | L1(중): {t_info['L1_pct']}% | L0(하): {t_info['L0_pct']}%",
+            # ✨ [개선] 100% 분할 커스텀 프로그레스 바 구현
+            l3_p = t_info["L3_pct"]
+            l2_p = t_info["L2_pct"]
+            l1_p = t_info["L1_pct"]
+            l0_p = t_info["L0_pct"]
+
+            st.markdown(
+                "<div style='font-size:0.85rem; color:#666; margin-top:10px; margin-bottom:5px; font-weight:bold;'>역량 수준별 분포 현황 (100% 비중)</div>",
+                unsafe_allow_html=True,
             )
+
+            # HTML & CSS 분할 바
+            custom_progress_html = f"""
+            <div style="width: 100%; background-color: #e0e0e0; border-radius: 8px; height: 26px; display: flex; overflow: hidden; font-size: 0.8rem; font-weight: bold; color: white; line-height: 26px; text-align: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                <div style="width: {l3_p}%; background-color: #8E44AD;" title="Level 3: {l3_p}%">
+                    {f'{l3_p}%' if l3_p >= 5 else ''}
+                </div>
+                <div style="width: {l2_p}%; background-color: #2980B9;" title="Level 2: {l2_p}%">
+                    {f'{l2_p}%' if l2_p >= 5 else ''}
+                </div>
+                <div style="width: {l1_p}%; background-color: #27AE60;" title="Level 1: {l1_p}%">
+                    {f'{l1_p}%' if l1_p >= 5 else ''}
+                </div>
+                <div style="width: {l0_p}%; background-color: #E67E22;" title="Level 0: {l0_p}%">
+                    {f'{l0_p}%' if l0_p >= 5 else ''}
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-top: 6px; padding: 0 4px;">
+                <span style="color: #8E44AD; font-weight: bold;">■ L3 (최상): {l3_p}%</span>
+                <span style="color: #2980B9; font-weight: bold;">■ L2 (상): {l2_p}%</span>
+                <span style="color: #27AE60; font-weight: bold;">■ L1 (중): {l1_p}%</span>
+                <span style="color: #E67E22; font-weight: bold;">■ L0 (하): {l0_p}%</span>
+            </div>
+            """
+            st.markdown(custom_progress_html, unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
