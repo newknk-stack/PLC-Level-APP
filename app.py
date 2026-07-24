@@ -19,20 +19,17 @@ cookie_manager = stx.CookieManager()
 # 세션 상태 초기화
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
+if "user_name" not in st.session_state:
+    st.session_state["user_name"] = None
 if "logout_triggered" not in st.session_state:
     st.session_state["logout_triggered"] = False
 
-# 브라우저 쿠키 확인
-saved_user = cookie_manager.get(cookie="logged_in_user")
-
-# 로그인 수행
-if (
-    saved_user
-    and not st.session_state["logged_in"]
-    and not st.session_state["logout_triggered"]
-):
-    st.session_state["logged_in"] = True
-    st.session_state["user_name"] = saved_user
+# 브라우저 쿠키 확인 (로그아웃 버튼을 누르지 않은 경우)
+if not st.session_state["logged_in"] and not st.session_state["logout_triggered"]:
+    saved_user = cookie_manager.get(cookie="logged_in_user")
+    if saved_user:
+        st.session_state["logged_in"] = True
+        st.session_state["user_name"] = saved_user
 
 # 평가 항목 (10선) 및 평가자/대상자 기본 정의
 ITEMS = [
@@ -202,7 +199,7 @@ TABLE_STYLE = """
 """
 
 # -------------------------------------------------------------------
-# 🔐 로그인 화면
+# 🔐 로그인 처리 (미로그인 시 메인 앱 실행 차단)
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
     st.title("🔐 PLC S/W 역량 진단 평가 시스템")
@@ -229,10 +226,12 @@ if not st.session_state["logged_in"]:
             else:
                 st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
 
+    # 미로그인 상태 시 여기서 스크립트 실행 중단 (아래 메인 코드 실행 방지)
     st.stop()
 
+
 # -------------------------------------------------------------------
-# 👤 사이드바
+# 👤 사이드바 (로그인 성공 시에만 노출)
 # -------------------------------------------------------------------
 st.sidebar.markdown(f"### 👤 **접속자 정보**")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
@@ -249,7 +248,7 @@ st.title("⚡ PLC S/W 역량 진단 평가 시스템")
 
 
 # -------------------------------------------------------------------
-# ☁️ 구글 시트 연동 설정 (API 초과 방지 캐싱 적용)
+# ☁️ 구글 시트 연동 설정
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_gspread_client():
@@ -276,7 +275,7 @@ def get_worksheet():
     return sheet
 
 
-# API Quota 초과 방지를 위해 10초간 캐시(ttl=10) 유지
+# API 초과 방지를 위한 10초 캐시
 @st.cache_data(ttl=10)
 def load_data():
     try:
@@ -292,8 +291,7 @@ def load_data():
         return df
     except Exception as e:
         if "429" in str(e):
-            st.warning("⚠️ 구글 API 요청 한도 초과로 잠시 대기 중입니다. 5초 후 자동으로 다시 시도합니다.")
-            time.sleep(5)
+            time.sleep(3)
             return load_data()
         st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
@@ -373,7 +371,6 @@ with tab1:
             l2_p = t_info["L2_pct"]
             l3_p = t_info["L3_pct"]
 
-            # 타이틀 옆 안내 텍스트
             st.markdown(
                 f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
                 f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
@@ -382,7 +379,6 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-            # 파스텔 톤 색상 조합
             raw_levels = [
                 ("L3", l3_p, "#5C5470", "white"),
                 ("L2", l2_p, "#7C83FD", "white"),
@@ -511,7 +507,6 @@ with tab1:
             "점수 저장 및 제출", type="primary", use_container_width=True
         ):
             try:
-                # 저장 시 최신 데이터 읽기
                 df = load_data()
 
                 existing_idx = df[
@@ -531,7 +526,6 @@ with tab1:
                 sheet.clear()
                 sheet.update([df.columns.values.tolist()] + df.values.tolist())
 
-                # 💡 데이터를 새로 저장했으므로 캐시 초기화
                 st.cache_data.clear()
 
                 st.success(
