@@ -304,7 +304,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # -------------------------------------------------------------------
-# TAB 1: 평가 점수 입력 (슬라이더 눈금/경계선 추가)
+# TAB 1: 평가 점수 입력 (그래프 내부 눈금선 수정)
 # -------------------------------------------------------------------
 with tab1:
     st.subheader("평가 점수 제출")
@@ -448,33 +448,39 @@ with tab1:
     st.markdown("---")
     st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
 
-    # 🎨 슬라이더 하단 눈금선 및 라벨 스타일 정의
+    # 🎨 슬라이더 그래프 선 안쪽(내부) 눈금선 및 라벨 스타일
     st.markdown(
         """
         <style>
-            .stSlider {
-                margin-bottom: -10px;
+            /* 슬라이더 바 내부 수직 위치 조절 */
+            div[data-testid="stSlider"] {
+                padding-bottom: 0px;
             }
-            .slider-ticks {
+            .slider-in-ticks {
                 display: flex;
                 justify-content: space-between;
-                padding: 0 6px;
-                margin-top: -12px;
-                margin-bottom: 20px;
-                font-size: 0.72rem;
-                color: #777777;
-                font-weight: 500;
+                position: relative;
+                top: 26px; /* 트랙 안으로 눈금선 레이어 배치 */
+                z-index: 2;
+                pointer-events: none;
+                padding: 0 11px;
+                margin-bottom: -16px;
             }
-            .slider-ticks span {
+            .slider-in-ticks span {
+                font-size: 0.68rem;
+                color: #888888;
+                font-weight: 600;
                 text-align: center;
-                width: 18px;
+                width: 14px;
+                line-height: 1;
             }
-            .slider-ticks span::before {
-                content: '|';
+            .slider-in-ticks span::after {
+                content: '';
                 display: block;
-                font-size: 0.65rem;
-                color: #bbb;
-                margin-bottom: -2px;
+                width: 1px;
+                height: 6px;
+                background-color: #aaaaaa;
+                margin: 2px auto 0 auto;
             }
         </style>
         """,
@@ -490,6 +496,17 @@ with tab1:
         
         for j, item in enumerate(row_items):
             with cols[j]:
+                # 트랙 내부 눈금선 HTML 삽입
+                st.markdown(
+                    """
+                    <div class="slider-in-ticks">
+                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                        <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                
                 scores[item] = st.slider(
                     f"{item}", 
                     min_value=0, 
@@ -497,16 +514,6 @@ with tab1:
                     value=5, 
                     step=1,
                     key=f"slide_{item}"
-                )
-                # 눈금 라벨 출력
-                st.markdown(
-                    """
-                    <div class="slider-ticks">
-                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
-                        <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
                 )
 
     st.markdown("---")
@@ -581,7 +588,7 @@ with tab1:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
 # -------------------------------------------------------------------
-# TAB 2: 종합 평가 결과 대시보드 (정렬 기능 적용)
+# TAB 2: 종합 평가 결과 대시보드
 # -------------------------------------------------------------------
 with tab2:
     st.subheader("종합 평가 현황")
@@ -634,7 +641,6 @@ with tab2:
         summary_df = pd.DataFrame(summary_list)
         download_df = pd.DataFrame(download_list)
 
-        # 🔄 정렬방식 선택
         sort_option = st.radio(
             "📌 **표 정렬 방식 선택**",
             ["피평가자 이름순", "종합 평균점수 높은순 ➔ 피평가자 이름순"],
