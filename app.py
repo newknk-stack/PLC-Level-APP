@@ -755,11 +755,31 @@ def get_worksheet():
     return sheet
 
 
-@st.cache_data(ttl=15)
+def _read_with_retry(read_fn, max_retries=4, base_delay=3):
+    """구글 시트 읽기 요청을 실행하되, 동시 접속자가 많아 API 사용량 제한
+    (429 'Quota exceeded' 오류)에 걸리면 잠깐 대기 후 자동으로 재시도한다.
+    (이전에는 실패 시 무조건 1회만 재시도했는데, 분당 요청 한도는 보통
+    수십 초가 지나야 풀리기 때문에 그 정도로는 부족했다. 재시도 간격을
+    점점 늘려가며 여러 번 시도하도록 개선.) 그래도 계속 실패하면 마지막
+    예외를 그대로 호출한 쪽에 던진다."""
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            return read_fn()
+        except Exception as e:
+            last_exc = e
+            if "429" in str(e) and attempt < max_retries - 1:
+                time.sleep(base_delay * (attempt + 1))
+                continue
+            raise
+    raise last_exc
+
+
+@st.cache_data(ttl=20)
 def load_data():
     try:
         sheet = get_worksheet()
-        records = sheet.get_all_records()
+        records = _read_with_retry(sheet.get_all_records)
         df = pd.DataFrame(records)
         if df.empty:
             df = pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
@@ -770,9 +790,13 @@ def load_data():
         return df
     except Exception as e:
         if "429" in str(e):
-            time.sleep(2)
-            return load_data()
-        st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
+            st.warning(
+                "지금 접속자가 많아 구글 시트 응답이 지연되고 있습니다. "
+                "잠시 후 자동으로 다시 시도되니 몇 초 뒤 화면을 새로고침하거나 "
+                "다시 시도해 주세요."
+            )
+        else:
+            st.error(f"구글 시트 데이터를 불러오는 중 오류가 발생했습니다: {e}")
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
 
@@ -785,7 +809,12 @@ def save_dataframe_to_sheet(df):
         sheet.update([["evaluator", "target"] + ITEMS])
     else:
         sheet.update([df.columns.values.tolist()] + df.values.tolist())
-    st.cache_data.clear()
+    # 평가 데이터(load_data)만 무효화한다. 예전에는 st.cache_data.clear()로
+    # confirmations/exclusions/chat_messages 캐시까지 전부 함께 지워버려서,
+    # 누군가 점수를 저장할 때마다 다른 모든 평가자의 다음 화면 갱신이
+    # "캐시 없음" 상태로 한꺼번에 구글 시트를 다시 읽게 되고, 이게 겹치면
+    # 읽기 요청이 순간적으로 몰려 429(Quota exceeded) 오류의 원인이 됐다.
+    load_data.clear()
 
 
 def get_or_create_worksheet(title, header_row):
@@ -816,11 +845,11 @@ def get_confirmation_worksheet():
     )
 
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=15)
 def load_confirmations():
     try:
         ws = get_confirmation_worksheet()
-        records = ws.get_all_records()
+        records = _read_with_retry(ws.get_all_records, max_retries=3, base_delay=2)
         result = {}
         for r in records:
             result[r.get("evaluator", "")] = {
@@ -883,12 +912,12 @@ def get_exclusion_worksheet():
     )
 
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=15)
 def load_exclusions():
     """평가자별로 '평가 미적용' 처리된 대상자 이름 집합을 돌려준다."""
     try:
         ws = get_exclusion_worksheet()
-        records = ws.get_all_records()
+        records = _read_with_retry(ws.get_all_records, max_retries=3, base_delay=2)
         result = {}
         for r in records:
             _ev = r.get("evaluator", "")
@@ -1016,11 +1045,11 @@ def get_chat_worksheet():
     )
 
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=8)
 def load_chat_messages():
     try:
         ws = get_chat_worksheet()
-        records = ws.get_all_records()
+        records = _read_with_retry(ws.get_all_records, max_retries=3, base_delay=2)
         return records[-100:]  # 최근 100건만 사용 (시트가 무한정 길어지는 것 방지)
     except Exception:
         return []
@@ -1049,7 +1078,7 @@ def migrate_legacy_items_if_needed():
     """
     try:
         sheet = get_worksheet()
-        records = sheet.get_all_records()
+        records = _read_with_retry(sheet.get_all_records, max_retries=3, base_delay=2)
         if not records:
             return  # 저장된 평가 데이터가 없으면 변환할 것도 없음
 
@@ -1086,11 +1115,21 @@ def migrate_legacy_items_if_needed():
         st.warning(f"평가 항목 스키마(10개→5개) 자동 변환 중 문제가 발생했습니다: {e}")
 
 
-# 평가 항목 스키마(10개→5개) 자동 변환은 세션당 한 번만 시도한다.
-# (ADMIN_USERS / is_admin은 사이드바에서도 필요해 로그인 직후로 이동했다.)
-if "legacy_items_migration_checked" not in st.session_state:
+# 평가 항목 스키마(10개→5개) 자동 변환 여부 확인은 원래 "세션(브라우저 탭)당
+# 한 번"이었는데, 이 확인 자체가 캐시를 타지 않는(=매번 구글 시트를 직접
+# 읽는) 별도 호출이라서, 여러 평가자가 동시에 접속할 때마다 사람 수만큼
+# 읽기 요청이 한꺼번에 몰리는 원인 중 하나였다. 변환은 이미 완료되면 이후
+# 다시 필요해질 일이 없는 "1회성 점검"이므로, st.cache_resource로 만든
+# 서버 프로세스 전체 공유 플래그를 사용해 "이 앱이 떠 있는 동안 딱 한 번만"
+# 확인하도록 바꿨다(재배포/재시작되면 다시 한 번 확인됨).
+@st.cache_resource
+def _migration_checked_flag():
+    return {"done": False}
+
+
+if not _migration_checked_flag()["done"]:
     migrate_legacy_items_if_needed()
-    st.session_state["legacy_items_migration_checked"] = True
+    _migration_checked_flag()["done"] = True
 
 
 
@@ -1188,6 +1227,10 @@ CHANGELOG = [
     {
         "title": "역량 본인 평가 참고 카드 높이 통일",
         "desc": "'역량 본인 평가 참고 현황'의 카드 5개(등급/Level 3~0) 크기가 라벨 줄바꿈이나 화면 폭에 따라 서로 다르게 보이던 문제를 수정했습니다. 이제 화면 폭이 좁아 글자가 여러 줄로 바뀌어도 5개 카드가 항상 같은 높이로 맞춰집니다.",
+    },
+    {
+        "title": "동시 접속자가 많을 때 '구글 시트 오류(429)' 자주 뜨던 문제 완화",
+        "desc": "여러 평가자가 동시에 접속·저장할 때 구글 시트 읽기 요청이 한꺼번에 몰려 'Quota exceeded' 오류가 자주 뜨던 문제를 줄였습니다. 오류가 나도 잠시 후 자동으로 다시 시도하도록 개선했고, 점수를 저장할 때 불필요하게 다른 화면들의 캐시까지 함께 지워지던 부분과 접속할 때마다 반복 실행되던 내부 점검 로직을 정리해 전체 요청 횟수를 줄였습니다.",
     },
 ]
 
