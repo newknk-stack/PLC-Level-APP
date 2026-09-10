@@ -1,4 +1,6 @@
 import time
+from io import BytesIO
+
 import extra_streamlit_components as stx
 from google.oauth2.service_account import Credentials
 import gspread
@@ -278,6 +280,120 @@ def get_pre_grade(target_full_name):
     return "-"
 
 
+def compute_dashboard_summary(df):
+    """대상자별 종합 평가 요약(항목별 평균, 합계 점수, 등급 등)을 계산한다.
+    TAB2(종합 평가 결과 대시보드) 화면 표시와, TAB3 엑셀 내보내기에서 대상자별
+    시트를 만들 때 공통으로 사용한다."""
+    df = df.copy()
+    for item in ITEMS:
+        df[item] = pd.to_numeric(df[item], errors="coerce").fillna(0)
+
+    summary_list = []
+    raw_grades_list = []
+    download_list = []
+
+    for target_person in df["target"].unique():
+        sub_df = df[df["target"] == target_person]
+        eval_count = len(sub_df)
+
+        item_means = sub_df[ITEMS].mean()
+        total_score = item_means.sum()
+
+        est_grade = calculate_grade(total_score)
+        pre_grade = get_pre_grade(target_person)
+        raw_grades_list.append(est_grade)
+
+        colored_grade_html = get_colored_grade_html(est_grade, pre_grade)
+
+        row = {
+            "피평가자": target_person,
+            "평가인원": eval_count,
+            "종합 평균점수": round(total_score, 1),
+            "기술 평가 등급(역량 본인 평가)": colored_grade_html,
+        }
+        row_dl = {
+            "피평가자": target_person,
+            "평가인원": eval_count,
+            "종합 평균점수": round(total_score, 1),
+            "기술 평가 등급(역량 본인 평가)": f"{est_grade} ({pre_grade})",
+        }
+
+        for item in ITEMS:
+            score_val = round(item_means[item], 1)
+            row[item] = score_val
+            row_dl[item] = score_val
+
+        summary_list.append(row)
+        download_list.append(row_dl)
+
+    summary_df = pd.DataFrame(summary_list)
+    download_df = pd.DataFrame(download_list)
+    return summary_df, download_df, raw_grades_list
+
+
+def sanitize_sheet_name(name):
+    """엑셀 시트 이름 제약(31자 이내, 특수문자 금지)에 맞게 문자열을 정리한다."""
+    invalid_chars = ["\\", "/", "?", "*", "[", "]", ":"]
+    clean = str(name)
+    for ch in invalid_chars:
+        clean = clean.replace(ch, "_")
+    return clean[:31] if clean else "Sheet"
+
+
+def build_evaluation_excel(detail_df, dashboard_targets_df):
+    """상세 평가 기록(detail_df)과 대상자별 종합 대시보드 요약을
+    (dashboard_targets_df, target별로 미리 계산된 요약 dict)
+    하나의 엑셀 워크북(BytesIO)으로 묶어서 반환한다."""
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # 1) 상세 평가 기록 시트
+        detail_sheet_name = sanitize_sheet_name("평가상세")
+        if detail_df.empty:
+            pd.DataFrame(columns=["평가자", "평가 대상자"] + ITEMS).to_excel(
+                writer, sheet_name=detail_sheet_name, index=False
+            )
+        else:
+            detail_df.to_excel(writer, sheet_name=detail_sheet_name, index=False)
+
+        # 2) 대상자별 종합 평가 대시보드 요약 시트 (대상자 1명당 시트 1개)
+        used_sheet_names = {detail_sheet_name}
+        for target_name, target_info in dashboard_targets_df.items():
+            base_name = sanitize_sheet_name(target_name)
+            sheet_name = base_name
+            suffix = 2
+            while sheet_name in used_sheet_names:
+                sheet_name = sanitize_sheet_name(f"{base_name}_{suffix}")
+                suffix += 1
+            used_sheet_names.add(sheet_name)
+
+            header_df = pd.DataFrame(
+                [
+                    {
+                        "피평가자": target_name,
+                        "평가인원": target_info["평가인원"],
+                        "종합 평균점수": target_info["종합 평균점수"],
+                        "기술 평가 등급(역량 본인 평가)": target_info["등급표시"],
+                    }
+                ]
+            )
+            items_df = pd.DataFrame(
+                {
+                    "평가 항목": ITEMS,
+                    "항목별 평균점수": [target_info[it] for it in ITEMS],
+                }
+            )
+
+            header_df.to_excel(
+                writer, sheet_name=sheet_name, index=False, startrow=0
+            )
+            items_df.to_excel(
+                writer, sheet_name=sheet_name, index=False, startrow=3
+            )
+
+    output.seek(0)
+    return output.getvalue()
+
+
 # -------------------------------------------------------------------
 # 🔐 로그인 화면
 # -------------------------------------------------------------------
@@ -412,14 +528,40 @@ def load_data():
         return pd.DataFrame(columns=["evaluator", "target"] + ITEMS)
 
 
+def save_dataframe_to_sheet(df):
+    """평가 데이터프레임을 구글 시트에 그대로 반영(덮어쓰기)한다.
+    저장/수정/삭제 로직에서 공통으로 사용한다."""
+    sheet = get_worksheet()
+    sheet.clear()
+    if df.empty:
+        sheet.update([["evaluator", "target"] + ITEMS])
+    else:
+        sheet.update([df.columns.values.tolist()] + df.values.tolist())
+    st.cache_data.clear()
+
+
+# -------------------------------------------------------------------
+# 🛡️ 관리자 계정 설정 (평가 데이터 삭제/수정 권한)
+# -------------------------------------------------------------------
+ADMIN_USERS = ["김남권"]
+is_admin = st.session_state.get("user_name") in ADMIN_USERS
+
+
 # -------------------------------------------------------------------
 # 📌 메인 탭 화면 (소프트 파스텔 블루 톤 탭 적용)
 # -------------------------------------------------------------------
-tab1, tab2, tab3 = st.tabs([
+_tab_labels = [
     "📝  평가 입력",
     "📊  종합 평가 결과 대시보드",
     "🔍  평가자별 / 대상자별 상세 조회",
-])
+]
+if is_admin:
+    _tab_labels.append("🛠️  관리자 (평가 데이터 관리)")
+
+_tabs = st.tabs(_tab_labels)
+tab1, tab2, tab3 = _tabs[0], _tabs[1], _tabs[2]
+if is_admin:
+    tab4 = _tabs[3]
 
 # -------------------------------------------------------------------
 # TAB 1: 평가 점수 입력
@@ -429,17 +571,24 @@ with tab1:
 
     evaluator = st.session_state["user_name"]
 
+    # 저장 직후 리런된 경우, 완료 안내 메시지를 한 번만 표시
+    if st.session_state.get("save_flash_message"):
+        st.success(st.session_state["save_flash_message"])
+        del st.session_state["save_flash_message"]
+
     df_current = load_data()
     completed_targets = []
+    completed_rows_by_target = {}
     if not df_current.empty and "evaluator" in df_current.columns and "target" in df_current.columns:
-        completed_targets = df_current[df_current["evaluator"] == evaluator]["target"].tolist()
+        my_rows = df_current[df_current["evaluator"] == evaluator]
+        completed_targets = my_rows["target"].tolist()
+        for _, _row in my_rows.iterrows():
+            completed_rows_by_target[_row["target"]] = _row
 
-    display_targets = []
-    for t in TARGETS:
+    def _format_target_option(t):
         if t in completed_targets:
-            display_targets.append(f"{t}  (✅ 평가 완료)")
-        else:
-            display_targets.append(t)
+            return f"{t}  (✅ 평가 완료)"
+        return t
 
     col1, col2 = st.columns(2)
     with col1:
@@ -447,8 +596,17 @@ with tab1:
             "평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True
         )
     with col2:
-        selected_display_target = st.selectbox("평가 대상자 선택", display_targets)
-        target = selected_display_target.replace("  (✅ 평가 완료)", "")
+        # 옵션 값 자체(TARGETS)는 매 리런마다 동일하게 유지하고, 완료 표시는
+        # format_func로만 붙여서 저장/리런 후에도 선택값이 유지되도록 한다.
+        # (기존에는 "이름 (✅ 평가 완료)" 형태로 옵션 문자열 자체를 바꿔서,
+        #  저장 후 리런되면 이전 선택값을 옵션 목록에서 찾지 못해 정렬순 첫 번째
+        #  대상자인 "권준성 CL3"로 되돌아가는 버그가 있었다.)
+        target = st.selectbox(
+            "평가 대상자 선택",
+            TARGETS,
+            format_func=_format_target_option,
+            key="tab1_selected_target",
+        )
 
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
@@ -576,7 +734,13 @@ with tab1:
             )
 
     st.markdown("---")
-    st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
+    if target in completed_targets:
+        st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점) — ✅ 이미 제출한 평가이며, 아래에 기존 점수가 표시됩니다. 수정 후 다시 저장할 수 있습니다.")
+    else:
+        st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
+
+    # 이미 평가를 완료한 대상자를 다시 선택하면 기존에 저장된 점수를 슬라이더 기본값으로 표시한다.
+    existing_row = completed_rows_by_target.get(target)
 
     scores = {}
 
@@ -586,8 +750,18 @@ with tab1:
         cols = st.columns(len(row_items))
         for j, item in enumerate(row_items):
             with cols[j]:
+                if existing_row is not None:
+                    try:
+                        default_val = int(existing_row[item])
+                    except (ValueError, TypeError):
+                        default_val = 5
+                else:
+                    default_val = 5
+
+                # 대상자별로 슬라이더 key를 분리해서, 평가 대상자를 바꿨을 때
+                # 이전 대상자에 입력하던 점수가 그대로 남아있지 않도록 한다.
                 scores[item] = st.slider(
-                    f"{item}", 0, 10, 5, key=f"slide_{item}"
+                    f"{item}", 0, 10, default_val, key=f"slide_{target}_{item}"
                 )
 
     st.markdown("---")
@@ -649,15 +823,15 @@ with tab1:
                         [df, pd.DataFrame([new_row])], ignore_index=True
                     )
 
-                sheet = get_worksheet()
-                sheet.clear()
-                sheet.update([df.columns.values.tolist()] + df.values.tolist())
+                save_dataframe_to_sheet(df)
 
-                st.cache_data.clear()
-
-                st.success(
+                # 저장 직후 바로 "평가 완료" 상태가 반영되도록 리런한다.
+                # 대상자 선택 selectbox는 key로 고정된 값(target 원본 문자열)을
+                # 그대로 유지하므로, 리런 후에도 다른 대상자로 튕기지 않는다.
+                st.session_state["save_flash_message"] = (
                     f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 성공적으로 저장되었습니다!"
                 )
+                st.rerun()
             except Exception as e:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
@@ -674,46 +848,7 @@ with tab2:
         for item in ITEMS:
             df[item] = pd.to_numeric(df[item], errors="coerce").fillna(0)
 
-        summary_list = []
-        raw_grades_list = []
-        download_list = []
-
-        for target_person in df["target"].unique():
-            sub_df = df[df["target"] == target_person]
-            eval_count = len(sub_df)
-            
-            item_means = sub_df[ITEMS].mean()
-            total_score = item_means.sum()
-
-            est_grade = calculate_grade(total_score)
-            pre_grade = get_pre_grade(target_person)
-            raw_grades_list.append(est_grade)
-
-            colored_grade_html = get_colored_grade_html(est_grade, pre_grade)
-
-            row = {
-                "피평가자": target_person,
-                "평가인원": eval_count,
-                "종합 평균점수": round(total_score, 1),
-                "기술 평가 등급(역량 본인 평가)": colored_grade_html,
-            }
-            row_dl = {
-                "피평가자": target_person,
-                "평가인원": eval_count,
-                "종합 평균점수": round(total_score, 1),
-                "기술 평가 등급(역량 본인 평가)": f"{est_grade} ({pre_grade})",
-            }
-
-            for item in ITEMS:
-                score_val = round(item_means[item], 1)
-                row[item] = score_val
-                row_dl[item] = score_val
-
-            summary_list.append(row)
-            download_list.append(row_dl)
-
-        summary_df = pd.DataFrame(summary_list)
-        download_df = pd.DataFrame(download_list)
+        summary_df, download_df, raw_grades_list = compute_dashboard_summary(df)
 
         # 🏆 등급 현황 통계를 맨 위로 이동
         st.markdown("### 🏆 등급 현황 통계")
@@ -894,6 +1029,10 @@ with tab3:
             ),
             axis=1,
         )
+        # 엑셀 내보내기용 일반 텍스트 등급 (색상 HTML이 아닌 순수 텍스트)
+        display_df["기술 평가 등급(역량 본인 평가) [텍스트]"] = display_df.apply(
+            lambda r: f"{r['_temp_est_grade']} ({r['_temp_pre_grade']})", axis=1
+        )
 
         column_order = [
             "평가자",
@@ -901,21 +1040,32 @@ with tab3:
             "기술 평가 등급(역량 본인 평가)",
             "합산 점수",
         ] + ITEMS
-        display_df = display_df[column_order]
+        export_column_order = [
+            "평가자",
+            "평가 대상자",
+            "기술 평가 등급(역량 본인 평가) [텍스트]",
+            "합산 점수",
+        ] + ITEMS
 
-        filtered_df = display_df.copy()
+        filtered_full_df = display_df.copy()
 
         if sel_evaluator != "전체":
-            filtered_df = filtered_df[filtered_df["평가자"] == sel_evaluator]
+            filtered_full_df = filtered_full_df[
+                filtered_full_df["평가자"] == sel_evaluator
+            ]
 
         if sel_target != "전체":
-            filtered_df = filtered_df[filtered_df["평가 대상자"] == sel_target]
+            filtered_full_df = filtered_full_df[
+                filtered_full_df["평가 대상자"] == sel_target
+            ]
 
         # 📌 1차: 평가자 이름순(오름차순), 2차: 합산 점수 높은순(내림차순) 정렬 적용
-        filtered_df = filtered_df.sort_values(
-            by=["평가자", "합산 점수"], 
-            ascending=[True, False]
+        filtered_full_df = filtered_full_df.sort_values(
+            by=["평가자", "합산 점수"],
+            ascending=[True, False],
         )
+
+        filtered_df = filtered_full_df[column_order]
 
         st.markdown(
             f"**총 {len(filtered_df)}건의 완료된 평가 데이터가 검색되었습니다.**"
@@ -925,3 +1075,206 @@ with tab3:
             index=False, escape=False, classes="styled-table"
         )
         st.markdown(CUSTOM_STYLE + html_filtered_table, unsafe_allow_html=True)
+
+        # -----------------------------------------------------------
+        # 📥 엑셀 내보내기 — 현재 조회 중인 상세 평가 기록 + 관련 대상자별
+        # 종합 평가 대시보드 요약을 각각 시트(탭)로 묶어서 다운로드
+        # -----------------------------------------------------------
+        st.markdown("---")
+        st.markdown("#### 📥 현재 조회 결과 엑셀로 내보내기")
+        st.caption(
+            "‘평가상세’ 시트에는 현재 필터로 조회된 평가 기록이, "
+            "이후 시트들에는 조회 결과에 포함된 대상자별 종합 평가 대시보드 요약이 각각 담깁니다."
+        )
+
+        if filtered_df.empty:
+            st.info("내보낼 평가 데이터가 없습니다. 필터 조건을 확인해 주세요.")
+        else:
+            export_detail_df = filtered_full_df[export_column_order].rename(
+                columns={
+                    "기술 평가 등급(역량 본인 평가) [텍스트]": "기술 평가 등급(역량 본인 평가)"
+                }
+            )
+
+            # 조회 결과에 포함된 대상자들의 종합 평가 대시보드(전체 평가자 평균 기준) 요약을 준비
+            dashboard_targets_for_export = {}
+            all_df_for_dashboard = load_data()
+            if (
+                not all_df_for_dashboard.empty
+                and "target" in all_df_for_dashboard.columns
+            ):
+                dash_summary_df, _, _ = compute_dashboard_summary(
+                    all_df_for_dashboard
+                )
+                targets_in_view = filtered_full_df["평가 대상자"].unique().tolist()
+                for t_name in targets_in_view:
+                    t_row_match = dash_summary_df[
+                        dash_summary_df["피평가자"] == t_name
+                    ]
+                    if t_row_match.empty:
+                        continue
+                    t_row = t_row_match.iloc[0]
+                    dashboard_targets_for_export[t_name] = {
+                        "평가인원": t_row["평가인원"],
+                        "종합 평균점수": t_row["종합 평균점수"],
+                        "등급표시": t_row["기술 평가 등급(역량 본인 평가)"],
+                        **{it: t_row[it] for it in ITEMS},
+                    }
+                    # 위 dash_summary_df의 등급 컬럼은 색상 HTML이므로, 엑셀에는
+                    # 순수 텍스트 등급으로 대체한다.
+                    plain_grade_match = filtered_full_df[
+                        filtered_full_df["평가 대상자"] == t_name
+                    ]
+                    dashboard_targets_for_export[t_name]["등급표시"] = (
+                        f"{calculate_grade(t_row['종합 평균점수'])} ({get_pre_grade(t_name)})"
+                    )
+
+            excel_bytes = build_evaluation_excel(
+                export_detail_df, dashboard_targets_for_export
+            )
+
+            st.download_button(
+                label="📥 상세 평가 기록 + 대상자별 대시보드 요약 (엑셀) 다운로드",
+                data=excel_bytes,
+                file_name="PLC_Software_역량진단_상세조회_결과.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+# -------------------------------------------------------------------
+# TAB 4: 관리자 전용 — 평가 데이터 수정 / 삭제 (김남권 계정만 접근 가능)
+# -------------------------------------------------------------------
+if is_admin:
+    with tab4:
+        st.subheader("🛠️ 관리자 - 평가 데이터 관리")
+        st.caption("이 메뉴는 관리자 계정(김남권)만 접근할 수 있으며, 모든 평가자의 점수를 수정하거나 삭제할 수 있습니다.")
+
+        if st.session_state.get("admin_flash_message"):
+            st.success(st.session_state["admin_flash_message"])
+            del st.session_state["admin_flash_message"]
+
+        df_admin = load_data()
+
+        if df_admin.empty:
+            st.info("아직 입력된 평가 데이터가 없습니다.")
+        else:
+            for item in ITEMS:
+                df_admin[item] = pd.to_numeric(df_admin[item], errors="coerce").fillna(0)
+            df_admin["합산 점수"] = df_admin[ITEMS].sum(axis=1).round(1)
+
+            st.markdown("#### 📋 전체 평가 데이터")
+            st.dataframe(
+                df_admin.rename(columns={"evaluator": "평가자", "target": "평가 대상자"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.markdown("---")
+            st.markdown("#### ✏️ 개별 평가 데이터 수정 / 삭제")
+
+            admin_col1, admin_col2 = st.columns(2)
+            with admin_col1:
+                admin_evaluator = st.selectbox(
+                    "평가자 선택",
+                    sorted(df_admin["evaluator"].unique()),
+                    key="admin_sel_evaluator",
+                )
+
+            admin_target_options = sorted(
+                df_admin[df_admin["evaluator"] == admin_evaluator]["target"].unique()
+            )
+            with admin_col2:
+                admin_target = st.selectbox(
+                    "평가 대상자 선택",
+                    admin_target_options,
+                    key="admin_sel_target",
+                )
+
+            admin_row_match = df_admin[
+                (df_admin["evaluator"] == admin_evaluator)
+                & (df_admin["target"] == admin_target)
+            ]
+
+            if admin_row_match.empty:
+                st.info("선택한 평가자/대상자 조합의 평가 데이터가 없습니다.")
+            else:
+                admin_row = admin_row_match.iloc[0]
+                st.markdown(
+                    f"**[{admin_evaluator}] 평가자 → [{admin_target}] 대상자** 평가 데이터 (합산 {admin_row['합산 점수']:.1f}점)"
+                )
+
+                admin_scores = {}
+                items_per_row = 2
+                for i in range(0, len(ITEMS), items_per_row):
+                    row_items = ITEMS[i : i + items_per_row]
+                    cols = st.columns(len(row_items))
+                    for j, item in enumerate(row_items):
+                        with cols[j]:
+                            try:
+                                cur_val = int(admin_row[item])
+                            except (ValueError, TypeError):
+                                cur_val = 0
+                            admin_scores[item] = st.slider(
+                                f"{item}",
+                                0,
+                                10,
+                                cur_val,
+                                key=f"admin_slide_{admin_evaluator}_{admin_target}_{item}",
+                            )
+
+                st.markdown("---")
+                admin_btn_col1, admin_btn_col2 = st.columns(2)
+
+                with admin_btn_col1:
+                    if st.button(
+                        "💾 수정 내용 저장",
+                        type="primary",
+                        use_container_width=True,
+                        key="admin_save_btn",
+                    ):
+                        try:
+                            df_full = load_data()
+                            idx = df_full[
+                                (df_full["evaluator"] == admin_evaluator)
+                                & (df_full["target"] == admin_target)
+                            ].index
+                            if len(idx) > 0:
+                                for key, val in admin_scores.items():
+                                    df_full.loc[idx[0], key] = val
+                                save_dataframe_to_sheet(df_full)
+                                st.session_state["admin_flash_message"] = (
+                                    f"[{admin_evaluator}] → [{admin_target}] 평가 데이터가 수정되었습니다."
+                                )
+                                st.rerun()
+                            else:
+                                st.warning("해당 데이터를 찾을 수 없습니다. (다른 관리자가 이미 삭제했을 수 있습니다)")
+                        except Exception as e:
+                            st.error(f"수정 중 오류가 발생했습니다: {e}")
+
+                with admin_btn_col2:
+                    admin_confirm_delete = st.checkbox(
+                        "⚠️ 삭제를 확인합니다 (되돌릴 수 없습니다)",
+                        key=f"admin_confirm_del_{admin_evaluator}_{admin_target}",
+                    )
+                    if st.button(
+                        "🗑️ 해당 평가 삭제",
+                        use_container_width=True,
+                        key="admin_delete_btn",
+                        disabled=not admin_confirm_delete,
+                    ):
+                        try:
+                            df_full = load_data()
+                            idx = df_full[
+                                (df_full["evaluator"] == admin_evaluator)
+                                & (df_full["target"] == admin_target)
+                            ].index
+                            if len(idx) > 0:
+                                df_full = df_full.drop(idx)
+                                save_dataframe_to_sheet(df_full)
+                                st.session_state["admin_flash_message"] = (
+                                    f"[{admin_evaluator}] → [{admin_target}] 평가 데이터가 삭제되었습니다."
+                                )
+                                st.rerun()
+                            else:
+                                st.warning("해당 데이터를 찾을 수 없습니다. (다른 관리자가 이미 삭제했을 수 있습니다)")
+                        except Exception as e:
+                            st.error(f"삭제 중 오류가 발생했습니다: {e}")
