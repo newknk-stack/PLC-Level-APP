@@ -105,22 +105,27 @@ CUSTOM_STYLE = f"""
     div[data-baseweb="select"],
     div[data-baseweb="select"] > div,
     div[data-baseweb="select"] > div > div,
-    [data-testid="stSelectbox"] [role="group"] {{
+    [data-testid="stSelectbox"] [role="group"],
+    [data-testid="stMultiSelect"] [role="group"] {{
         background-color: {ACCENT_SOFT} !important;
         border-radius: 10px !important;
     }}
     div[data-baseweb="select"] > div,
-    [data-testid="stSelectbox"] [role="group"] {{
+    [data-testid="stSelectbox"] [role="group"],
+    [data-testid="stMultiSelect"] [role="group"] {{
         border: 1.5px solid #C4B5FD !important;
         box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
     }}
     div[data-baseweb="select"] > div:hover,
     [data-testid="stSelectbox"] [role="group"]:hover,
-    [data-testid="stSelectbox"] [role="group"]:focus-within {{
+    [data-testid="stSelectbox"] [role="group"]:focus-within,
+    [data-testid="stMultiSelect"] [role="group"]:hover,
+    [data-testid="stMultiSelect"] [role="group"]:focus-within {{
         border-color: {ACCENT} !important;
     }}
     div[data-baseweb="select"] span,
-    [data-testid="stSelectbox"] input[role="combobox"] {{
+    [data-testid="stSelectbox"] input[role="combobox"],
+    [data-testid="stMultiSelect"] input[role="combobox"] {{
         color: {TEXT_MAIN} !important;
         background-color: transparent !important;
     }}
@@ -146,14 +151,34 @@ CUSTOM_STYLE = f"""
     }}
 
     /* 메트릭: 옅은 카드 타일 느낌 + 값이 길어도 잘리지 않고 줄바꿈되도록 처리
-       ("C등급 (보통)" 같은 값이 좁은 칸에서 말줄임(...)으로 잘리는 문제 수정) */
+       ("C등급 (보통)" 같은 값이 좁은 칸에서 말줄임(...)으로 잘리는 문제 수정).
+       한 행(st.columns)에 놓인 메트릭 카드끼리 내용 길이(라벨 줄바꿈, delta 유무 등)가
+       달라 높이가 제각각이던 문제도 함께 수정 — Streamlit은 컬럼 행 자체를
+       (align-items: stretch)로 이미 가장 높은 컬럼에 맞춰 늘려주지만, 그 안의
+       stElementContainer/stMetric은 그 늘어난 공간을 채우지 않고 자기 내용만큼만
+       차지해서 카드 배경이 서로 다른 높이로 보였다. 메트릭을 감싸는 컨테이너에
+       flex:1 + height:100%를 줘서 항상 그 행에서 가장 높은 카드에 맞춰 늘어나도록
+       하고, 내용은 세로 가운데 정렬한다. (다른 st.columns 레이아웃에는 영향 없도록
+       :has()로 메트릭을 담은 컨테이너에만 적용) */
+    [data-testid="stElementContainer"]:has(> [data-testid="stMetric"]) {{
+        flex: 1 1 auto;
+        display: flex;
+    }}
     [data-testid="stMetric"] {{
         background-color: {SURFACE_MUTED};
         border-radius: 12px;
         padding: 14px 16px;
         border: 1px solid {BORDER};
+        min-height: 92px;
+        width: 100%;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
     }}
-    [data-testid="stMetricValue"] {{
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricValue"] p {{
         font-size: 1.15rem !important;
         white-space: normal !important;
         overflow: visible !important;
@@ -1156,6 +1181,14 @@ CHANGELOG = [
         "title": "평가자 접속·진행 현황을 전체 공개 + 통합 표시",
         "desc": "그동안 관리자에게만 보이던 '현재 접속 중인 평가자'와 '평가자별 진행 현황'을 모든 로그인 사용자가 사이드바에서 볼 수 있도록 바꿨습니다. 두 목록을 평가자 한 명당 한 줄(접속 여부 ● + 이름 + 진행 상태 뱃지)로 통합했습니다.",
     },
+    {
+        "title": "평가 미적용 인원 목록 레이아웃 개선",
+        "desc": "'평가 미적용으로 표시한 인원 보기' 목록이 인원 한 명당 버튼 한 줄을 차지해 인원이 많으면 스크롤이 길어지던 문제를 개선했습니다. 이름은 4열 그리드로 한눈에 볼 수 있게 하고, 되돌리기는 여러 명을 한 번에 선택해 되돌리거나 전체를 한 번에 되돌릴 수 있는 버튼으로 바꿨습니다.",
+    },
+    {
+        "title": "역량 본인 평가 참고 카드 높이 통일",
+        "desc": "'역량 본인 평가 참고 현황'의 카드 5개(등급/Level 3~0) 크기가 라벨 줄바꿈이나 화면 폭에 따라 서로 다르게 보이던 문제를 수정했습니다. 이제 화면 폭이 좁아 글자가 여러 줄로 바뀌어도 5개 카드가 항상 같은 높이로 맞춰집니다.",
+    },
 ]
 
 
@@ -1605,13 +1638,42 @@ with tab1:
 
         if _my_exclusions_set:
             with st.expander(f"🚫 평가 미적용으로 표시한 인원 보기 ({len(_my_exclusions_set)}명)"):
-                for _excl_t in sorted(_my_exclusions_set):
-                    _excl_c1, _excl_c2 = st.columns([3, 1])
-                    _excl_c1.write(f"• {_excl_t}")
-                    if _excl_c2.button(
-                        "되돌리기", key=f"undo_excl_{evaluator}_{_excl_t}"
+                _excl_sorted = sorted(_my_exclusions_set)
+
+                # 인원이 많아도 한눈에 훑어볼 수 있도록 이름만 다열 그리드로 표시
+                _excl_cols_per_row = 4
+                for i in range(0, len(_excl_sorted), _excl_cols_per_row):
+                    _excl_cols = st.columns(_excl_cols_per_row)
+                    for j, _name in enumerate(
+                        _excl_sorted[i : i + _excl_cols_per_row]
                     ):
-                        set_targets_exclusion(evaluator, [_excl_t], excluded=False)
+                        _excl_cols[j].caption(f"• {_name}")
+
+                st.markdown("---")
+                st.caption("되돌릴 인원을 선택한 뒤 버튼을 눌러주세요. 여러 명을 한 번에 선택할 수 있습니다.")
+                _to_restore = st.multiselect(
+                    "되돌릴 인원 선택",
+                    _excl_sorted,
+                    key=f"restore_multiselect_{evaluator}",
+                    label_visibility="collapsed",
+                )
+                _restore_c1, _restore_c2 = st.columns(2)
+                with _restore_c1:
+                    if st.button(
+                        "↩️ 선택 인원 되돌리기",
+                        key=f"restore_selected_{evaluator}",
+                        disabled=not _to_restore,
+                        use_container_width=True,
+                    ):
+                        set_targets_exclusion(evaluator, _to_restore, excluded=False)
+                        st.rerun()
+                with _restore_c2:
+                    if st.button(
+                        "↩️ 전체 되돌리기",
+                        key=f"restore_all_{evaluator}",
+                        use_container_width=True,
+                    ):
+                        set_targets_exclusion(evaluator, _excl_sorted, excluded=False)
                         st.rerun()
 
         if _my_confirmed:
