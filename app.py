@@ -13,146 +13,124 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 UI 디자인 커스텀 CSS — "모던 SaaS 대시보드" 스타일
-# (카드형 레이아웃 + 부드러운 그림자, 바이올렛 포인트 컬러, 슬레이트 배경)
+# 🎨 UI 디자인 커스텀 CSS — "미니멀 모노톤" 스타일
+# (그레이스케일 + 인디고 포인트 컬러, 언더라인 탭/폼, 얇은 구분선 중심)
 # -------------------------------------------------------------------
-ACCENT = "#7C3AED"          # 포인트 컬러 (바이올렛)
-ACCENT_DARK = "#6D28D9"
-ACCENT_SOFT = "#F5F3FF"     # 포인트 컬러의 아주 옅은 틴트 (배경용)
-ACCENT_SOFT_BORDER = "#EDE9FE"
+ACCENT = "#3730A3"          # 포인트 컬러 (인디고)
+ACCENT_DARK = "#312E81"
+ACCENT_SOFT = "#EEF2FF"     # 포인트 컬러의 아주 옅은 틴트 (호버/배경용)
 SURFACE = "#FFFFFF"
-SURFACE_MUTED = "#F8FAFC"   # 카드 내부의 은은한 구분 배경
-APP_BG = "#F1F5F9"          # 전체 배경(슬레이트)
-TEXT_MAIN = "#0F172A"
-TEXT_SUB = "#64748B"
-BORDER = "#E2E8F0"
+TEXT_MAIN = "#111827"
+TEXT_SUB = "#6B7280"
+BORDER = "#E5E7EB"
 
 CUSTOM_STYLE = f"""
 <style>
-    /* 전체 배경: 카드가 떠 보이도록 은은한 슬레이트 톤 */
-    .stApp {{
-        background-color: {APP_BG};
-    }}
-    .block-container {{
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-    }}
-
-    /* 탭 네비게이션: 세그먼트(필) 스타일 트랙 */
+    /* 탭 네비게이션: 언더라인 스타일 (박스 없이 얇은 구분선만) */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 2px;
-        background-color: #E2E8F0;
-        padding: 4px;
-        border-radius: 12px;
+        gap: 32px;
+        background-color: transparent;
+        padding: 0;
+        border-radius: 0;
         border: none;
-        width: fit-content;
+        border-bottom: 1px solid {BORDER};
     }}
 
-    /* 각 탭 버튼: 트랙 위에 놓인 투명 필 */
+    /* 각 탭 버튼: 투명 배경, 은은한 회색 글자 */
     .stTabs [data-baseweb="tab"] {{
-        height: 42px;
+        height: 46px;
         white-space: pre-wrap;
         background-color: transparent;
-        border-radius: 9px;
+        border-radius: 0;
         gap: 8px;
-        padding: 0px 20px;
+        padding: 0px 2px;
         font-size: 0.92rem;
         font-weight: 600;
-        color: {TEXT_SUB};
+        color: #9CA3AF;
         border: none;
-        transition: all 0.15s ease-in-out;
+        border-bottom: 2px solid transparent;
+        transition: color 0.15s ease-in-out;
     }}
 
     .stTabs [data-baseweb="tab"]:hover {{
         color: {TEXT_MAIN};
     }}
 
-    /* 선택된 탭: 흰색 필 + 은은한 그림자 + 포인트 컬러 텍스트 */
+    /* 선택된 탭: 진한 글자색 + 인디고 언더라인 */
     .stTabs [aria-selected="true"] {{
-        background-color: {SURFACE} !important;
-        color: {ACCENT} !important;
-        border-radius: 9px !important;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.06);
+        background-color: transparent !important;
+        color: {TEXT_MAIN} !important;
+        border-radius: 0 !important;
+        border-bottom: 2px solid {ACCENT} !important;
+        box-shadow: none;
     }}
 
     .stTabs [data-baseweb="tab-highlight"] {{
         display: none !important;
     }}
 
-    /* primary 버튼: 바이올렛 솔리드 + 부드러운 컬러 그림자 */
+    /* primary 버튼: 인디고 솔리드, 그림자 없이 플랫하게 */
     div.stButton > button[kind="primary"] {{
         background-color: {ACCENT} !important;
         color: #FFFFFF !important;
         border: none !important;
-        border-radius: 10px !important;
-        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
+        border-radius: 6px !important;
+        box-shadow: none;
         font-weight: 600;
-        transition: all 0.15s ease-in-out;
+        transition: background-color 0.15s ease-in-out;
     }}
     div.stButton > button[kind="primary"]:hover {{
         background-color: {ACCENT_DARK} !important;
-        box-shadow: 0 6px 16px rgba(124, 58, 237, 0.36);
+        box-shadow: none;
     }}
 
-    /* 카드처럼 보이도록 입력 위젯들의 모서리를 둥글게 통일 */
+    /* 입력 위젯: 모서리를 최소한으로 둥글게, 테두리는 옅은 회색 하나로 통일 */
     div[data-baseweb="select"] > div,
     .stTextInput input,
     .stNumberInput input {{
-        border-radius: 10px !important;
+        border-radius: 6px !important;
         border-color: {BORDER} !important;
+        box-shadow: none !important;
     }}
 
-    /* 메트릭: 옅은 카드 타일 느낌 */
-    [data-testid="stMetric"] {{
-        background-color: {SURFACE_MUTED};
-        border-radius: 12px;
-        padding: 14px 16px;
-        border: 1px solid {BORDER};
-    }}
-
-    /* 결과 표: 카드형 컨테이너 + 열 균등 폭 + 좌우 스크롤 없이 컨테이너 폭에 맞춤 */
+    /* 결과 표: 장식 없이 얇은 테두리 + 열 균등 폭 + 좌우 스크롤 없이 컨테이너 폭에 맞춤 */
     .styled-table {{
         width: 100%;
         table-layout: fixed;
-        border-collapse: separate;
-        border-spacing: 0;
+        border-collapse: collapse;
         margin: 10px 0;
         font-size: 0.82rem;
         font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.06);
-        border-radius: 14px;
-        overflow: hidden;
         border: 1px solid {BORDER};
+        border-radius: 8px;
+        overflow: hidden;
     }}
     .styled-table thead tr {{
-        background-color: {SURFACE_MUTED};
-        color: #334155;
+        background-color: {SURFACE};
+        color: {TEXT_MAIN};
         text-align: center;
         font-weight: 700;
         white-space: normal;
         word-break: keep-all;
         overflow-wrap: break-word;
         line-height: 1.35;
+        border-bottom: 1.5px solid {TEXT_MAIN};
     }}
     .styled-table th {{
         padding: 12px 8px;
         text-align: center;
-        border-bottom: 1px solid {BORDER};
     }}
     .styled-table td {{
         padding: 10px 8px;
         text-align: center;
-        border-bottom: 1px solid #F1F5F9;
-        color: #334155;
+        border-bottom: 1px solid #F3F4F6;
+        color: #374151;
         white-space: normal;
         word-break: keep-all;
         overflow-wrap: break-word;
     }}
     .styled-table tbody tr:last-child td {{
         border-bottom: none;
-    }}
-    .styled-table tbody tr:nth-of-type(even) {{
-        background-color: #FAFAFC;
     }}
     .styled-table tbody tr:hover {{
         background-color: {ACCENT_SOFT};
@@ -462,11 +440,9 @@ if not st.session_state["logged_in"]:
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<div style="display: flex; align-items: center; gap: 14px; padding-top: 4px;">'
-            '<div style="flex: none; width: 44px; height: 44px; border-radius: 12px; background-color: #7C3AED; display: flex; align-items: center; justify-content: center;">'
-            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="1.5"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
-            '</div>'
-            '<h1 style="font-size: 2.4rem; font-weight: 800; color: #0F172A; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
+            '<div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">'
+            '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3730A3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="1.5"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
+            '<h1 style="font-size: 2.4rem; font-weight: 800; color: #111827; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -521,11 +497,9 @@ with col_title:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div style="display: flex; align-items: center; gap: 14px; padding-top: 4px;">'
-        '<div style="flex: none; width: 44px; height: 44px; border-radius: 12px; background-color: #7C3AED; display: flex; align-items: center; justify-content: center;">'
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>'
-        '</div>'
-        '<h1 style="font-size: 2.4rem; font-weight: 800; color: #0F172A; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
+        '<div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">'
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3730A3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>'
+        '<h1 style="font-size: 2.4rem; font-weight: 800; color: #111827; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -782,12 +756,12 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-            # 바이올렛 톤 단일 색상 램프 (Level 3 -> 0 로 갈수록 옅어짐)
+            # 인디고 톤 단일 색상 램프 (Level 3 -> 0 로 갈수록 옅어짐)
             raw_levels = [
-                ("Level 3", l3_p, "#6D28D9", "white"),
-                ("Level 2", l2_p, "#8B5CF6", "white"),
-                ("Level 1", l1_p, "#C4B5FD", "#4C1D95"),
-                ("Level 0", l0_p, "#EDE9FE", "#6D28D9"),
+                ("Level 3", l3_p, "#3730A3", "white"),
+                ("Level 2", l2_p, "#818CF8", "white"),
+                ("Level 1", l1_p, "#C7D2FE", "#312E81"),
+                ("Level 0", l0_p, "#EEF2FF", "#3730A3"),
             ]
 
             active_levels = [item for item in raw_levels if item[1] > 0]
@@ -915,11 +889,11 @@ with tab1:
     with btn_col1:
         st.markdown(
             f"""
-            <div style="background-color: #F5F3FF; padding: 10px 12px; border-radius: 12px; border: 1px solid #EDE9FE; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
+            <div style="border-top: 1px solid #E5E7EB; padding: 14px 4px 0 4px; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
                 <div style="white-space: nowrap;">
-                    <span style="font-size: 0.95rem; color: #475569; margin-right: 8px;">기술평가 등급(역량 본인 평가):</span>
+                    <span style="font-size: 0.95rem; color: #6B7280; margin-right: 8px;">기술평가 등급(역량 본인 평가):</span>
                     <span style="font-size: 1.2rem;">{colored_grade_display}</span>
-                    <span style="font-size: 0.9rem; color: #7C3AED; font-weight: 600; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
+                    <span style="font-size: 0.9rem; color: #3730A3; font-weight: 600; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
                 </div>
             </div>
             """,
@@ -1020,7 +994,11 @@ with tab2:
         fig = px.line_polar(
             radar_df, r="점수", theta="항목", line_close=True, range_r=[0, 10]
         )
-        fig.update_traces(fill="toself")
+        fig.update_traces(
+            fill="toself",
+            line_color="#3730A3",
+            fillcolor="rgba(55, 48, 163, 0.15)",
+        )
         st.plotly_chart(fig, use_container_width=True)
 
         # -------------------------------------------------------------------
@@ -1185,11 +1163,39 @@ with tab3:
                 filtered_full_df["평가 대상자"] == sel_target
             ]
 
-        # 📌 1차: 평가자 이름순(오름차순), 2차: 합산 점수 높은순(내림차순) 정렬 적용
-        filtered_full_df = filtered_full_df.sort_values(
-            by=["평가자", "합산 점수"],
-            ascending=[True, False],
+        # 표 정렬 기준 선택 — 평가자 / 평가 대상자 / 평가등급 중에서 선택
+        detail_sort_option = st.radio(
+            "📌 **표 정렬 기준 선택**",
+            ["평가자순", "평가 대상자순", "평가등급순"],
+            horizontal=True,
+            key="tab3_sort_option",
         )
+
+        if detail_sort_option == "평가자순":
+            # 1차: 평가자 이름순(오름차순), 2차: 합산 점수 높은순(내림차순)
+            filtered_full_df = filtered_full_df.sort_values(
+                by=["평가자", "합산 점수"],
+                ascending=[True, False],
+            )
+        elif detail_sort_option == "평가 대상자순":
+            # 1차: 평가 대상자 이름순(오름차순), 2차: 합산 점수 높은순(내림차순)
+            filtered_full_df = filtered_full_df.sort_values(
+                by=["평가 대상자", "합산 점수"],
+                ascending=[True, False],
+            )
+        else:
+            # 평가등급순: S -> A -> B -> C -> D 순으로 정렬하고,
+            # 같은 등급 안에서는 합산 점수 높은순, 그다음 평가자 이름순으로 정렬
+            grade_rank_map = {"S": 0, "A": 1, "B": 2, "C": 3, "D": 4}
+            filtered_full_df = filtered_full_df.copy()
+            filtered_full_df["_grade_rank"] = (
+                filtered_full_df["_temp_est_grade"].map(grade_rank_map).fillna(99)
+            )
+            filtered_full_df = filtered_full_df.sort_values(
+                by=["_grade_rank", "합산 점수", "평가자"],
+                ascending=[True, False, True],
+            )
+            filtered_full_df = filtered_full_df.drop(columns=["_grade_rank"])
 
         filtered_df = filtered_full_df[column_order]
 
