@@ -5,7 +5,6 @@ from google.oauth2.service_account import Credentials
 import gspread
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -13,118 +12,149 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 UI 디자인 커스텀 CSS — "미니멀 모노톤" 스타일
-# (그레이스케일 + 인디고 포인트 컬러, 언더라인 탭/폼, 얇은 구분선 중심)
+# 🎨 UI 디자인 커스텀 CSS — "모던 SaaS 대시보드" 스타일
+# (카드형 레이아웃 + 부드러운 그림자, 바이올렛 포인트 컬러, 슬레이트 배경)
 # -------------------------------------------------------------------
-ACCENT = "#3730A3"          # 포인트 컬러 (인디고)
-ACCENT_DARK = "#312E81"
-ACCENT_SOFT = "#EEF2FF"     # 포인트 컬러의 아주 옅은 틴트 (호버/배경용)
+ACCENT = "#7C3AED"          # 포인트 컬러 (바이올렛)
+ACCENT_DARK = "#6D28D9"
+ACCENT_SOFT = "#F5F3FF"     # 포인트 컬러의 아주 옅은 틴트 (배경용)
+ACCENT_SOFT_BORDER = "#EDE9FE"
 SURFACE = "#FFFFFF"
-TEXT_MAIN = "#111827"
-TEXT_SUB = "#6B7280"
-BORDER = "#E5E7EB"
+SURFACE_MUTED = "#F8FAFC"   # 카드 내부의 은은한 구분 배경
+APP_BG = "#F1F5F9"          # 전체 배경(슬레이트)
+TEXT_MAIN = "#0F172A"
+TEXT_SUB = "#64748B"
+BORDER = "#E2E8F0"
 
 CUSTOM_STYLE = f"""
 <style>
-    /* 탭 네비게이션: 언더라인 스타일 (박스 없이 얇은 구분선만) */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 32px;
-        background-color: transparent;
-        padding: 0;
-        border-radius: 0;
-        border: none;
-        border-bottom: 1px solid {BORDER};
+    /* 전체 배경: 카드가 떠 보이도록 은은한 슬레이트 톤 */
+    .stApp {{
+        background-color: {APP_BG};
+    }}
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 3rem;
     }}
 
-    /* 각 탭 버튼: 투명 배경, 은은한 회색 글자 */
+    /* 탭 네비게이션: 세그먼트(필) 스타일 트랙 */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 2px;
+        background-color: #E2E8F0;
+        padding: 4px;
+        border-radius: 12px;
+        border: none;
+        width: fit-content;
+    }}
+
+    /* 각 탭 버튼: 트랙 위에 놓인 투명 필 */
     .stTabs [data-baseweb="tab"] {{
-        height: 46px;
+        height: 42px;
         white-space: pre-wrap;
         background-color: transparent;
-        border-radius: 0;
+        border-radius: 9px;
         gap: 8px;
-        padding: 0px 2px;
+        padding: 0px 20px;
         font-size: 0.92rem;
         font-weight: 600;
-        color: #9CA3AF;
+        color: {TEXT_SUB};
         border: none;
-        border-bottom: 2px solid transparent;
-        transition: color 0.15s ease-in-out;
+        transition: all 0.15s ease-in-out;
     }}
 
     .stTabs [data-baseweb="tab"]:hover {{
         color: {TEXT_MAIN};
     }}
 
-    /* 선택된 탭: 진한 글자색 + 인디고 언더라인 */
+    /* 선택된 탭: 흰색 필 + 은은한 그림자 + 포인트 컬러 텍스트 */
     .stTabs [aria-selected="true"] {{
-        background-color: transparent !important;
-        color: {TEXT_MAIN} !important;
-        border-radius: 0 !important;
-        border-bottom: 2px solid {ACCENT} !important;
-        box-shadow: none;
+        background-color: {SURFACE} !important;
+        color: {ACCENT} !important;
+        border-radius: 9px !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.06);
     }}
 
     .stTabs [data-baseweb="tab-highlight"] {{
         display: none !important;
     }}
 
-    /* primary 버튼: 인디고 솔리드, 그림자 없이 플랫하게 */
+    /* primary 버튼: 바이올렛 솔리드 + 부드러운 컬러 그림자 */
     div.stButton > button[kind="primary"] {{
         background-color: {ACCENT} !important;
         color: #FFFFFF !important;
         border: none !important;
-        border-radius: 6px !important;
-        box-shadow: none;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
         font-weight: 600;
-        transition: background-color 0.15s ease-in-out;
+        transition: all 0.15s ease-in-out;
     }}
     div.stButton > button[kind="primary"]:hover {{
         background-color: {ACCENT_DARK} !important;
-        box-shadow: none;
+        box-shadow: 0 6px 16px rgba(124, 58, 237, 0.36);
     }}
 
-    /* 입력 위젯: 모서리를 최소한으로 둥글게, 테두리는 옅은 회색 하나로 통일 */
+    /* 카드처럼 보이도록 입력 위젯들의 모서리를 둥글게 통일 */
     div[data-baseweb="select"] > div,
     .stTextInput input,
     .stNumberInput input {{
-        border-radius: 6px !important;
+        border-radius: 10px !important;
         border-color: {BORDER} !important;
-        box-shadow: none !important;
     }}
 
-    /* 결과 표: 장식 없이 얇은 테두리 + 열 균등 폭 + 좌우 스크롤 없이 컨테이너 폭에 맞춤 */
+    /* 메트릭: 옅은 카드 타일 느낌 */
+    [data-testid="stMetric"] {{
+        background-color: {SURFACE_MUTED};
+        border-radius: 12px;
+        padding: 14px 16px;
+        border: 1px solid {BORDER};
+    }}
+
+    /* st.container(border=True) 카드: 흰 배경 + 둥근 모서리 + 은은한 그림자
+       (탭1의 대상자 선택 / 사전 진단 / 점수 입력 섹션을 카드로 묶는 데 사용) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        border-radius: 16px !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.05);
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {{
+        border-radius: 16px !important;
+        border-color: {BORDER} !important;
+        background-color: {SURFACE} !important;
+    }}
+
+    /* 결과 표: 카드형 컨테이너 + 열 균등 폭 + 좌우 스크롤 없이 컨테이너 폭에 맞춤 */
     .styled-table {{
         width: 100%;
         table-layout: fixed;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         margin: 10px 0;
         font-size: 0.82rem;
         font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        border: 1px solid {BORDER};
-        border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.06);
+        border-radius: 14px;
         overflow: hidden;
+        border: 1px solid {BORDER};
     }}
     .styled-table thead tr {{
-        background-color: {SURFACE};
-        color: {TEXT_MAIN};
+        background-color: {SURFACE_MUTED};
+        color: #334155;
         text-align: center;
         font-weight: 700;
         white-space: normal;
         word-break: keep-all;
         overflow-wrap: break-word;
         line-height: 1.35;
-        border-bottom: 1.5px solid {TEXT_MAIN};
     }}
     .styled-table th {{
         padding: 12px 8px;
         text-align: center;
+        border-bottom: 1px solid {BORDER};
     }}
     .styled-table td {{
         padding: 10px 8px;
         text-align: center;
-        border-bottom: 1px solid #F3F4F6;
-        color: #374151;
+        border-bottom: 1px solid #F1F5F9;
+        color: #334155;
         white-space: normal;
         word-break: keep-all;
         overflow-wrap: break-word;
@@ -132,8 +162,17 @@ CUSTOM_STYLE = f"""
     .styled-table tbody tr:last-child td {{
         border-bottom: none;
     }}
+    .styled-table tbody tr:nth-of-type(even) {{
+        background-color: #FAFAFC;
+    }}
     .styled-table tbody tr:hover {{
         background-color: {ACCENT_SOFT};
+    }}
+
+    /* 사이드바: 접속자 정보/관리자 패널도 카드 톤에 맞춰 은은하게 */
+    section[data-testid="stSidebar"] {{
+        background-color: {SURFACE_MUTED};
+        border-right: 1px solid {BORDER};
     }}
 </style>
 """
@@ -430,88 +469,255 @@ def build_evaluation_excel(detail_df, dashboard_targets_df):
 
 
 # -------------------------------------------------------------------
-# 🔐 로그인 화면
+# 🔐 로그인 화면 — 중앙 정렬 카드형 레이아웃
 # -------------------------------------------------------------------
 if not st.session_state["logged_in"]:
-    col_l_title, col_l_logo = st.columns([3.5, 2.5])
-    with col_l_title:
-        st.markdown(
-            '<p style="color: #64748B; font-size: 1.25rem; font-weight: 600; margin-bottom: 2px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">'
-            '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3730A3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="1.5"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
-            '<h1 style="font-size: 2.4rem; font-weight: 800; color: #111827; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with col_l_logo:
-        st.markdown(
-            '<div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%; padding-top: 5px;">'
-            '<span style="font-size: 1.7rem; font-weight: 900; font-family: sans-serif; letter-spacing: 1px; color: #111; line-height: 1.1;">posco</span>'
-            '<span style="font-size: 2.2rem; font-weight: 900; font-family: sans-serif; letter-spacing: -0.5px; color: #111; line-height: 1.2;">포스코<span style="color: #0056B3;">DX</span></span>'
-            '<span style="font-size: 1.1rem; font-weight: 700; font-family: sans-serif; letter-spacing: 0.5px;"><span style="color: #C68A00;">AI</span> <span style="color: #555;">Native Company</span></span>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+    _login_l, _login_c, _login_r = st.columns([1, 1.2, 1])
+    with _login_c:
+        with st.container(border=True):
+            st.markdown(
+                '<div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:6px 4px 2px 4px;">'
+                '<div style="width:52px;height:52px;border-radius:14px;background:#7C3AED;'
+                'display:flex;align-items:center;justify-content:center;'
+                'box-shadow:0 6px 16px rgba(124,58,237,0.35);margin-bottom:16px;">'
+                '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" '
+                'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+                '<rect x="4" y="10" width="16" height="10" rx="1.5"></rect>'
+                '<path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
+                '</div>'
+                '<h1 style="font-size:1.45rem;font-weight:800;color:#0F172A;margin:0 0 6px 0;line-height:1.3;">'
+                'PLC S/W 역량 진단 평가 시스템</h1>'
+                '<p style="color:#64748B;font-size:0.85rem;font-weight:600;margin:0;">'
+                '물류자동화그룹 · 공항사업섹션 · T1 T2 BHS운영</p>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
 
-    st.write("시스템에 접속하려면 본인 이름 선택 및 공동 비밀번호를 입력해 주세요.")
+            st.markdown(
+                '<p style="color:#94A3B8;font-size:0.82rem;text-align:center;margin:20px 0 6px 0;">'
+                '본인 이름 선택 및 공동 비밀번호를 입력해 주세요</p>',
+                unsafe_allow_html=True,
+            )
 
-    with st.form("login_form"):
-        user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
-        input_pw = st.text_input("🔑 공동 비밀번호 입력", type="password")
-        submit = st.form_submit_button("로그인", type="primary")
+            with st.form("login_form"):
+                user_name = st.selectbox("👤 평가자(이름) 선택", EVALUATORS)
+                input_pw = st.text_input("🔑 공동 비밀번호 입력", type="password")
+                submit = st.form_submit_button(
+                    "로그인", type="primary", use_container_width=True
+                )
 
-        if submit:
-            correct_pw = st.secrets.get("common_password", "2026")
+                if submit:
+                    correct_pw = st.secrets.get("common_password", "2026")
 
-            if input_pw == str(correct_pw):
-                st.session_state["logged_in"] = True
-                st.session_state["user_name"] = user_name
+                    if input_pw == str(correct_pw):
+                        st.session_state["logged_in"] = True
+                        st.session_state["user_name"] = user_name
 
-                st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
-                time.sleep(0.3)
-                st.rerun()
-            else:
-                st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
+                        st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
+                        time.sleep(0.3)
+                        st.rerun()
+                    else:
+                        st.error("비밀번호가 올바르지 않습니다. 다시 확인해 주세요.")
+
+            st.markdown(
+                '<div style="text-align:center;margin-top:18px;padding-top:14px;'
+                'border-top:1px solid #F1F5F9;">'
+                '<span style="font-size:0.92rem;font-weight:900;font-family:sans-serif;'
+                'letter-spacing:0.5px;color:#94A3B8;">posco </span>'
+                '<span style="font-size:0.92rem;font-weight:900;font-family:sans-serif;color:#334155;">'
+                '포스코<span style="color:#7C3AED;">DX</span></span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
 
     st.stop()
 
 
 # -------------------------------------------------------------------
+# 🛡️ 관리자 계정 설정 (평가 데이터 삭제/수정 권한)
+# — 사이드바(접속 중 평가자 표시 등)에서도 필요하므로 로그인 직후,
+#   사이드바를 그리기 전에 먼저 계산해 둔다.
+# -------------------------------------------------------------------
+ADMIN_USERS = ["김남권"]
+is_admin = st.session_state.get("user_name") in ADMIN_USERS
+
+
+# -------------------------------------------------------------------
+# 🟢 접속 중인 평가자 실시간 트래킹
+# st.cache_resource로 만든 객체는 같은 서버 프로세스에서 실행되는 모든
+# 세션(브라우저 탭)이 공유하는 싱글턴이므로, "누가 지금 접속해 있는지"를
+# 세션 간에 공유하는 저장소로 사용할 수 있다. (st.session_state는 세션별로
+# 분리되어 있어 이 용도로는 사용할 수 없다.)
+# -------------------------------------------------------------------
+@st.cache_resource
+def _active_sessions_store():
+    return {}
+
+
+def _touch_active_session(name):
+    """현재 세션이 살아있음을 공유 저장소에 기록(마지막 접속 시각 갱신)."""
+    if name:
+        _active_sessions_store()[name] = time.time()
+
+
+def _clear_active_session(name):
+    """로그아웃 시 공유 저장소에서 즉시 제거."""
+    if name:
+        _active_sessions_store().pop(name, None)
+
+
+def _get_currently_active_evaluators(timeout_seconds=300):
+    """최근 timeout_seconds 이내에 화면이 갱신된 평가자만 '접속 중'으로 간주.
+    (탭을 닫아도 서버에 별도 알림이 오지 않으므로, 일정 시간 활동이 없으면
+    자동으로 목록에서 제외하는 방식으로 근사한다.)"""
+    store = _active_sessions_store()
+    now = time.time()
+    stale = [n for n, ts in store.items() if now - ts > timeout_seconds]
+    for n in stale:
+        store.pop(n, None)
+    return sorted(store.keys(), key=lambda n: store[n], reverse=True)
+
+
+_touch_active_session(st.session_state.get("user_name"))
+
+
+# -------------------------------------------------------------------
+# 📚 사이드바 콘텐츠 — 시스템 사용 매뉴얼 / 업데이트 내역 (관리자 전용 항목 포함)
+# -------------------------------------------------------------------
+MANUAL_TEXT = """
+**1. 로그인**
+본인 이름을 선택하고 공동 비밀번호를 입력하면 접속됩니다. 접속할 때마다 매번 로그인해야 하며(자동 로그인 없음), 다른 기기·브라우저에서 접속해도 동일합니다.
+
+**2. 📝 평가 입력**
+평가 대상자를 선택하면 사전 진단 참고 현황(있는 경우)이 표시됩니다. 5개 항목에 대해 0~10점으로 점수를 입력하고 [점수 저장 및 제출]을 누르면 즉시 저장됩니다. 이미 평가를 완료한 대상자는 목록에 "✅ 평가 완료"로 표시되며, 다시 선택하면 기존 점수가 그대로 불러와져 수정 후 재저장할 수 있습니다.
+
+**3. 📊 종합 평가 결과 대시보드**
+전체 평가 등급 통계, 대상자별 종합 평균점수 표, 방사형 차트(개인 vs 전체 평균 비교), 역량 진단 요약 리포트를 확인할 수 있습니다. 표 아래 버튼으로 전체 결과를 CSV로 내려받을 수 있습니다.
+
+**4. 🔍 상세 조회**
+평가자별·대상자별로 개별 평가 기록을 검색하고, 평가자순/대상자순/등급순으로 정렬할 수 있습니다. 조회 결과는 엑셀(대상자별 대시보드 요약 시트 포함)로 내려받을 수 있습니다.
+"""
+
+ADMIN_MANUAL_TEXT = """
+**🛡️ 관리자 전용 (김남권 계정)**
+
+- 사이드바에서 현재 접속 중인 평가자 목록을 실시간으로 볼 수 있습니다(5분 이상 활동이 없으면 자동 제외).
+- [🛠️ 관리자] 탭에서 전체 평가 데이터를 조회하고, 평가자·대상자를 선택해 점수를 직접 수정하거나 삭제할 수 있습니다.
+- 삭제는 되돌릴 수 없으므로, 확인 체크박스를 누른 뒤에만 삭제 버튼이 활성화됩니다.
+"""
+
+CHANGELOG = [
+    {
+        "title": "평가 저장 즉시 반영 + 관리자 계정(김남권) 도입",
+        "desc": "저장 직후 완료 상태가 바로 반영되도록 수정하고, 대상자 재선택 시 기존 점수를 불러오도록 개선했습니다. 김남권 계정에 평가 데이터 수정/삭제 권한을 부여했습니다.",
+    },
+    {
+        "title": "상세조회 탭 엑셀 내보내기 추가",
+        "desc": "조회된 평가 기록과 대상자별 종합 대시보드 요약을 엑셀 파일(여러 시트)로 내려받을 수 있습니다.",
+    },
+    {
+        "title": "평가 항목 10개 → 5개로 개편",
+        "desc": "핵심 5개 항목으로 평가 항목을 간소화하고, 기존 평가 데이터를 새 기준(100점 만점 유지)으로 자동 환산했습니다.",
+    },
+    {
+        "title": "상세조회 표 정렬 기능 추가",
+        "desc": "평가자순 / 평가 대상자순 / 평가등급순(S~D)으로 표를 정렬할 수 있습니다.",
+    },
+    {
+        "title": "로그인 자동 유지 기능 제거",
+        "desc": "접속할 때마다 반드시 로그인하도록 변경했습니다(쿠키 기반 자동 로그인 제거).",
+    },
+    {
+        "title": "UI '모던 SaaS 대시보드' 스타일 적용 + 화면 구조 개편",
+        "desc": "바이올렛 포인트 컬러의 카드형 디자인을 전체 화면에 적용하고, 로그인 화면을 중앙 카드형으로, 상단 헤더를 슬림 바 형태로 재구성했습니다. 평가 입력 화면의 각 섹션도 카드로 구분했습니다.",
+    },
+    {
+        "title": "관리자용 '현재 접속 중인 평가자' 사이드바 패널 추가",
+        "desc": "김남권 관리자 계정으로 접속하면 사이드바에서 현재 접속 중인 평가자 목록을 실시간으로 확인할 수 있습니다.",
+    },
+    {
+        "title": "역량 진단 요약 리포트 및 방사형 차트 고도화",
+        "desc": "방사형 차트에 전체 평균 비교선과 순위·팀 평균 대비 지표를 추가하고, 요약 리포트에 항목별 팀 평균 대비 상세 비교표를 추가했습니다.",
+    },
+    {
+        "title": "시스템 사용 매뉴얼 / 업데이트 내역 사이드바 메뉴 추가",
+        "desc": "사이드바에서 시스템 사용법과 지금까지의 업데이트 내역을 바로 확인할 수 있습니다. 관리자 전용 매뉴얼은 김남권 계정에서만 표시됩니다.",
+    },
+]
+
+
+# -------------------------------------------------------------------
 # 👤 사이드바
 # -------------------------------------------------------------------
-st.sidebar.markdown(f"### 👤 **접속자 정보**")
+st.sidebar.markdown("### 👤 접속자 정보")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 
+if is_admin:
+    st.sidebar.markdown("#### 🟢 현재 접속 중인 평가자")
+    _active_now = _get_currently_active_evaluators()
+    if _active_now:
+        for _name in _active_now:
+            _tag = " · 관리자" if _name in ADMIN_USERS else ""
+            st.sidebar.markdown(
+                f'<div style="display:flex;align-items:center;gap:7px;'
+                f'font-size:0.85rem;color:#334155;padding:2px 0;">'
+                f'<span style="width:8px;height:8px;border-radius:50%;'
+                f'background:#22C55E;display:inline-block;flex-shrink:0;"></span>'
+                f'{_name}{_tag}</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.sidebar.caption("현재 접속 중인 평가자가 없습니다.")
+    st.sidebar.caption("※ 5분 이상 활동이 없으면 자동으로 제외됩니다.")
+
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
+    _clear_active_session(st.session_state.get("user_name"))
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
     st.rerun()
 
-col_title, col_logo = st.columns([3.5, 2.5])
-with col_title:
-    st.markdown(
-        '<p style="color: #64748B; font-size: 1.25rem; font-weight: 600; margin-bottom: 2px;">물류자동화그룹 / 공항사업섹션 / T1 T2 BHS운영</p>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        '<div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">'
-        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3730A3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>'
-        '<h1 style="font-size: 2.4rem; font-weight: 800; color: #111827; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-with col_logo:
-    st.markdown(
-        '<div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%; padding-top: 5px;">'
-        '<span style="font-size: 1.7rem; font-weight: 900; font-family: sans-serif; letter-spacing: 1px; color: #111; line-height: 1.1;">posco</span>'
-        '<span style="font-size: 2.2rem; font-weight: 900; font-family: sans-serif; letter-spacing: -0.5px; color: #111; line-height: 1.2;">포스코<span style="color: #0056B3;">DX</span></span>'
-        '<span style="font-size: 1.1rem; font-weight: 700; font-family: sans-serif; letter-spacing: 0.5px;"><span style="color: #C68A00;">AI</span> <span style="color: #555;">Native Company</span></span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📚 도움말")
+with st.sidebar.expander("📖 시스템 사용 매뉴얼"):
+    st.markdown(MANUAL_TEXT)
+    if is_admin:
+        st.markdown("---")
+        st.markdown(ADMIN_MANUAL_TEXT)
+
+with st.sidebar.expander("🕘 업데이트 내역"):
+    st.caption("최신 업데이트가 위에 표시됩니다.")
+    for _entry in reversed(CHANGELOG):
+        st.markdown(f"**• {_entry['title']}**")
+        st.caption(_entry["desc"])
+
+# -------------------------------------------------------------------
+# 🏷️ 메인 상단 바 — 슬림 한 줄 헤더 (아이콘 + 타이틀 + 부서명)
+# -------------------------------------------------------------------
+st.markdown(
+    '<div style="display:flex;align-items:center;gap:14px;padding:6px 0 18px 0;'
+    'border-bottom:1px solid #E2E8F0;margin-bottom:18px;">'
+    '<div style="width:40px;height:40px;border-radius:11px;background:#7C3AED;'
+    'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
+    'box-shadow:0 4px 10px rgba(124,58,237,0.28);">'
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" '
+    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect x="4" y="10" width="16" height="10" rx="1.5"></rect>'
+    '<path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
+    '</div>'
+    '<div style="display:flex;flex-direction:column;gap:1px;">'
+    '<span style="font-size:1.3rem;font-weight:800;color:#0F172A;line-height:1.25;">'
+    'PLC S/W 역량 진단 평가 시스템</span>'
+    '<span style="font-size:0.82rem;color:#64748B;font-weight:600;">'
+    '물류자동화그룹 · 공항사업섹션 · T1 T2 BHS운영</span>'
+    '</div>'
+    '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;">'
+    '<span style="font-size:0.85rem;font-weight:900;font-family:sans-serif;color:#94A3B8;">posco </span>'
+    '<span style="font-size:0.85rem;font-weight:900;font-family:sans-serif;color:#334155;">'
+    '포스코<span style="color:#7C3AED;">DX</span></span>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 
 # -------------------------------------------------------------------
@@ -626,13 +832,8 @@ def migrate_legacy_items_if_needed():
         st.warning(f"평가 항목 스키마(10개→5개) 자동 변환 중 문제가 발생했습니다: {e}")
 
 
-# -------------------------------------------------------------------
-# 🛡️ 관리자 계정 설정 (평가 데이터 삭제/수정 권한)
-# -------------------------------------------------------------------
-ADMIN_USERS = ["김남권"]
-is_admin = st.session_state.get("user_name") in ADMIN_USERS
-
 # 평가 항목 스키마(10개→5개) 자동 변환은 세션당 한 번만 시도한다.
+# (ADMIN_USERS / is_admin은 사이드바에서도 필요해 로그인 직후로 이동했다.)
 if "legacy_items_migration_checked" not in st.session_state:
     migrate_legacy_items_if_needed()
     st.session_state["legacy_items_migration_checked"] = True
@@ -681,23 +882,25 @@ with tab1:
             return f"{t}  (✅ 평가 완료)"
         return t
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.text_input(
-            "평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True
-        )
-    with col2:
-        # 옵션 값 자체(TARGETS)는 매 리런마다 동일하게 유지하고, 완료 표시는
-        # format_func로만 붙여서 저장/리런 후에도 선택값이 유지되도록 한다.
-        # (기존에는 "이름 (✅ 평가 완료)" 형태로 옵션 문자열 자체를 바꿔서,
-        #  저장 후 리런되면 이전 선택값을 옵션 목록에서 찾지 못해 정렬순 첫 번째
-        #  대상자인 "권준성 CL3"로 되돌아가는 버그가 있었다.)
-        target = st.selectbox(
-            "평가 대상자 선택",
-            TARGETS,
-            format_func=_format_target_option,
-            key="tab1_selected_target",
-        )
+    with st.container(border=True):
+        st.markdown("**👤 평가자 / 🎯 평가 대상자 선택**")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input(
+                "평가자", value=f"{evaluator} (본인 로그인 완료)", disabled=True
+            )
+        with col2:
+            # 옵션 값 자체(TARGETS)는 매 리런마다 동일하게 유지하고, 완료 표시는
+            # format_func로만 붙여서 저장/리런 후에도 선택값이 유지되도록 한다.
+            # (기존에는 "이름 (✅ 평가 완료)" 형태로 옵션 문자열 자체를 바꿔서,
+            #  저장 후 리런되면 이전 선택값을 옵션 목록에서 찾지 못해 정렬순 첫 번째
+            #  대상자인 "권준성 CL3"로 되돌아가는 버그가 있었다.)
+            target = st.selectbox(
+                "평가 대상자 선택",
+                TARGETS,
+                format_func=_format_target_option,
+                key="tab1_selected_target",
+            )
 
     if target and not df_comp.empty:
         target_clean_name = target.split()[0]
@@ -705,156 +908,155 @@ with tab1:
 
         if not match.empty:
             t_info = match.iloc[0]
-            st.markdown("---")
 
-            grade_badge = {
-                "S": "🟣 S등급 (최우수)",
-                "A": "🔵 A등급 (우수)",
-                "B": "🟢 B등급 (숙련)",
-                "C": "🟡 C등급 (보통)",
-                "D": "🔴 D등급 (기초)",
-            }.get(t_info["등급"], f"{t_info['등급']} 등급")
+            with st.container(border=True):
+                grade_badge = {
+                    "S": "🟣 S등급 (최우수)",
+                    "A": "🔵 A등급 (우수)",
+                    "B": "🟢 B등급 (숙련)",
+                    "C": "🟡 C등급 (보통)",
+                    "D": "🔴 D등급 (기초)",
+                }.get(t_info["등급"], f"{t_info['등급']} 등급")
 
-            st.markdown(
-                f"##### 💡 **[{target}]** 님의 역량 본인 평가 참고 현황"
-            )
+                st.markdown(
+                    f"##### 💡 **[{target}]** 님의 역량 본인 평가 참고 현황"
+                )
 
-            m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("역량 본인 평가", grade_badge)
-            m2.metric(
-                "Level 3 (전문가 건수)",
-                f"{t_info['L3_cnt']}건",
-                f"{t_info['L3_pct']}%",
-            )
-            m3.metric(
-                "Level 2 (우수/숙련 건수)",
-                f"{t_info['L2_cnt']}건",
-                f"{t_info['L2_pct']}%",
-            )
-            m4.metric(
-                "Level 1 (보통/실전 건수)",
-                f"{t_info['L1_cnt']}건",
-                f"{t_info['L1_pct']}%",
-            )
-            m5.metric(
-                "Level 0 (기초/미흡 건수)",
-                f"{t_info['L0_cnt']}건",
-                f"{t_info['L0_pct']}%",
-                delta_color="inverse",
-            )
+                m1, m2, m3, m4, m5 = st.columns(5)
+                m1.metric("역량 본인 평가", grade_badge)
+                m2.metric(
+                    "Level 3 (전문가 건수)",
+                    f"{t_info['L3_cnt']}건",
+                    f"{t_info['L3_pct']}%",
+                )
+                m3.metric(
+                    "Level 2 (우수/숙련 건수)",
+                    f"{t_info['L2_cnt']}건",
+                    f"{t_info['L2_pct']}%",
+                )
+                m4.metric(
+                    "Level 1 (보통/실전 건수)",
+                    f"{t_info['L1_cnt']}건",
+                    f"{t_info['L1_pct']}%",
+                )
+                m5.metric(
+                    "Level 0 (기초/미흡 건수)",
+                    f"{t_info['L0_cnt']}건",
+                    f"{t_info['L0_pct']}%",
+                    delta_color="inverse",
+                )
 
-            l0_p = t_info["L0_pct"]
-            l1_p = t_info["L1_pct"]
-            l2_p = t_info["L2_pct"]
-            l3_p = t_info["L3_pct"]
+                l0_p = t_info["L0_pct"]
+                l1_p = t_info["L1_pct"]
+                l2_p = t_info["L2_pct"]
+                l3_p = t_info["L3_pct"]
 
-            st.markdown(
-                f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
-                f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
-                f"<span style='color: #888;'>Level 3(전문가): {l3_p}% &nbsp;|&nbsp; Level 2(우수/숙련): {l2_p}% &nbsp;|&nbsp; Level 1(보통/실전): {l1_p}% &nbsp;|&nbsp; Level 0(기초/미흡): {l0_p}%</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+                st.markdown(
+                    f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
+                    f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
+                    f"<span style='color: #888;'>Level 3(전문가): {l3_p}% &nbsp;|&nbsp; Level 2(우수/숙련): {l2_p}% &nbsp;|&nbsp; Level 1(보통/실전): {l1_p}% &nbsp;|&nbsp; Level 0(기초/미흡): {l0_p}%</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
-            # 인디고 톤 단일 색상 램프 (Level 3 -> 0 로 갈수록 옅어짐)
-            raw_levels = [
-                ("Level 3", l3_p, "#3730A3", "white"),
-                ("Level 2", l2_p, "#818CF8", "white"),
-                ("Level 1", l1_p, "#C7D2FE", "#312E81"),
-                ("Level 0", l0_p, "#EEF2FF", "#3730A3"),
-            ]
-
-            active_levels = [item for item in raw_levels if item[1] > 0]
-
-            min_width = 8.0
-            chart_data = []
-
-            if active_levels:
-                visual_widths = [
-                    max(val, min_width) for _, val, _, _ in active_levels
+                # 바이올렛 톤 단일 색상 램프 (Level 3 -> 0 로 갈수록 옅어짐)
+                raw_levels = [
+                    ("Level 3", l3_p, "#6D28D9", "white"),
+                    ("Level 2", l2_p, "#A78BFA", "white"),
+                    ("Level 1", l1_p, "#DDD6FE", "#4C1D95"),
+                    ("Level 0", l0_p, "#F5F3FF", "#6D28D9"),
                 ]
-                sum_v_w = sum(visual_widths)
-                norm_widths = [(w / sum_v_w) * 100 for w in visual_widths]
 
-                for (lbl, val, color, text_color), n_w in zip(
-                    active_levels, norm_widths
-                ):
-                    text_str = f"<b>{lbl} ({val}%)</b>"
-                    chart_data.append(
-                        (lbl, val, n_w, color, text_color, text_str)
+                active_levels = [item for item in raw_levels if item[1] > 0]
+
+                min_width = 8.0
+                chart_data = []
+
+                if active_levels:
+                    visual_widths = [
+                        max(val, min_width) for _, val, _, _ in active_levels
+                    ]
+                    sum_v_w = sum(visual_widths)
+                    norm_widths = [(w / sum_v_w) * 100 for w in visual_widths]
+
+                    for (lbl, val, color, text_color), n_w in zip(
+                        active_levels, norm_widths
+                    ):
+                        text_str = f"<b>{lbl} ({val}%)</b>"
+                        chart_data.append(
+                            (lbl, val, n_w, color, text_color, text_str)
+                        )
+
+                fig_bar = go.Figure()
+
+                for lbl, val, vis_w, color, text_color, text_str in chart_data:
+                    fig_bar.add_trace(
+                        go.Bar(
+                            y=["분포"],
+                            x=[vis_w],
+                            name=lbl,
+                            orientation="h",
+                            marker=dict(color=color),
+                            text=text_str,
+                            textposition="inside",
+                            textfont=dict(
+                                color=text_color, size=12, family="sans-serif"
+                            ),
+                            hovertemplate=f"{lbl}: {val}%<extra></extra>",
+                        )
                     )
 
-            fig_bar = go.Figure()
-
-            for lbl, val, vis_w, color, text_color, text_str in chart_data:
-                fig_bar.add_trace(
-                    go.Bar(
-                        y=["분포"],
-                        x=[vis_w],
-                        name=lbl,
-                        orientation="h",
-                        marker=dict(color=color),
-                        text=text_str,
-                        textposition="inside",
-                        textfont=dict(
-                            color=text_color, size=12, family="sans-serif"
-                        ),
-                        hovertemplate=f"{lbl}: {val}%<extra></extra>",
-                    )
+                fig_bar.update_layout(
+                    barmode="stack",
+                    xaxis=dict(
+                        range=[0, 100],
+                        showgrid=False,
+                        showticklabels=False,
+                        zeroline=False,
+                    ),
+                    yaxis=dict(showgrid=False, showticklabels=False),
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    height=32,
+                    showlegend=False,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
                 )
 
-            fig_bar.update_layout(
-                barmode="stack",
-                xaxis=dict(
-                    range=[0, 100],
-                    showgrid=False,
-                    showticklabels=False,
-                    zeroline=False,
-                ),
-                yaxis=dict(showgrid=False, showticklabels=False),
-                margin=dict(l=0, r=0, t=0, b=0),
-                height=32,
-                showlegend=False,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-            )
+                st.plotly_chart(
+                    fig_bar,
+                    use_container_width=True,
+                    config={"displayModeBar": False},
+                )
 
-            st.plotly_chart(
-                fig_bar,
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
+    with st.container(border=True):
+        st.markdown("**📝 항목별 점수 입력** (0점 ~ 10점)")
+        if target in completed_targets:
+            st.caption("✅ 이미 제출한 평가이며, 아래에 기존 점수가 표시됩니다. 수정 후 다시 저장할 수 있습니다.")
 
-    st.markdown("---")
-    if target in completed_targets:
-        st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점) — ✅ 이미 제출한 평가이며, 아래에 기존 점수가 표시됩니다. 수정 후 다시 저장할 수 있습니다.")
-    else:
-        st.write("각 항목별 점수를 입력하세요 (0점 ~ 10점)")
+        # 이미 평가를 완료한 대상자를 다시 선택하면 기존에 저장된 점수를 슬라이더 기본값으로 표시한다.
+        existing_row = completed_rows_by_target.get(target)
 
-    # 이미 평가를 완료한 대상자를 다시 선택하면 기존에 저장된 점수를 슬라이더 기본값으로 표시한다.
-    existing_row = completed_rows_by_target.get(target)
+        scores = {}
 
-    scores = {}
-
-    items_per_row = 2
-    for i in range(0, len(ITEMS), items_per_row):
-        row_items = ITEMS[i : i + items_per_row]
-        cols = st.columns(len(row_items))
-        for j, item in enumerate(row_items):
-            with cols[j]:
-                if existing_row is not None:
-                    try:
-                        default_val = int(existing_row[item])
-                    except (ValueError, TypeError):
+        items_per_row = 2
+        for i in range(0, len(ITEMS), items_per_row):
+            row_items = ITEMS[i : i + items_per_row]
+            cols = st.columns(len(row_items))
+            for j, item in enumerate(row_items):
+                with cols[j]:
+                    if existing_row is not None:
+                        try:
+                            default_val = int(existing_row[item])
+                        except (ValueError, TypeError):
+                            default_val = 5
+                    else:
                         default_val = 5
-                else:
-                    default_val = 5
 
-                # 대상자별로 슬라이더 key를 분리해서, 평가 대상자를 바꿨을 때
-                # 이전 대상자에 입력하던 점수가 그대로 남아있지 않도록 한다.
-                scores[item] = st.slider(
-                    f"{item}", 0, 10, default_val, key=f"slide_{target}_{item}"
-                )
+                    # 대상자별로 슬라이더 key를 분리해서, 평가 대상자를 바꿨을 때
+                    # 이전 대상자에 입력하던 점수가 그대로 남아있지 않도록 한다.
+                    scores[item] = st.slider(
+                        f"{item}", 0, 10, default_val, key=f"slide_{target}_{item}"
+                    )
 
     st.markdown("---")
 
@@ -889,11 +1091,11 @@ with tab1:
     with btn_col1:
         st.markdown(
             f"""
-            <div style="border-top: 1px solid #E5E7EB; padding: 14px 4px 0 4px; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
+            <div style="background-color: #F5F3FF; border: 1px solid #EDE9FE; border-radius: 12px; padding: 14px 4px; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
                 <div style="white-space: nowrap;">
                     <span style="font-size: 0.95rem; color: #6B7280; margin-right: 8px;">기술평가 등급(역량 본인 평가):</span>
                     <span style="font-size: 1.2rem;">{colored_grade_display}</span>
-                    <span style="font-size: 0.9rem; color: #3730A3; font-weight: 600; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
+                    <span style="font-size: 0.9rem; color: #7C3AED; font-weight: 600; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
                 </div>
             </div>
             """,
@@ -987,25 +1189,84 @@ with tab2:
             summary_df["피평가자"] == selected_target
         ].iloc[0]
 
-        radar_df = pd.DataFrame(
-            {"항목": ITEMS, "점수": [target_info[item] for item in ITEMS]}
+        # 팀 전체 평균(항목별) 및 순위 — 방사형 차트에 비교선으로 함께 표시하고
+        # 요약 리포트에서도 "전체 평균 대비" 코멘트를 만드는 데 사용한다.
+        team_avg_by_item = summary_df[ITEMS].mean()
+        team_avg_total = round(team_avg_by_item.sum() * SCORE_NORMALIZE_FACTOR, 1)
+
+        rank_df = summary_df.sort_values(
+            by=["종합 평균점수"], ascending=False
+        ).reset_index(drop=True)
+        target_rank = int(
+            rank_df[rank_df["피평가자"] == selected_target].index[0]
+        ) + 1
+        total_people = len(rank_df)
+
+        rk1, rk2, rk3 = st.columns(3)
+        rk1.metric("종합 평균점수", f"{target_info['종합 평균점수']}점")
+        rk2.metric("전체 내 순위", f"{target_rank} / {total_people}위")
+        rk3.metric(
+            "팀 평균 대비",
+            f"{target_info['종합 평균점수'] - team_avg_total:+.1f}점",
         )
 
-        fig = px.line_polar(
-            radar_df, r="점수", theta="항목", line_close=True, range_r=[0, 10]
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatterpolar(
+                r=[team_avg_by_item[item] for item in ITEMS]
+                + [team_avg_by_item[ITEMS[0]]],
+                theta=ITEMS + [ITEMS[0]],
+                fill="toself",
+                name="전체 평균",
+                line=dict(color="#CBD5E1", width=1.5, dash="dot"),
+                fillcolor="rgba(148, 163, 184, 0.10)",
+            )
         )
-        fig.update_traces(
-            fill="toself",
-            line_color="#3730A3",
-            fillcolor="rgba(55, 48, 163, 0.15)",
+        fig.add_trace(
+            go.Scatterpolar(
+                r=[target_info[item] for item in ITEMS] + [target_info[ITEMS[0]]],
+                theta=ITEMS + [ITEMS[0]],
+                fill="toself",
+                name=selected_target,
+                line=dict(color="#7C3AED", width=2.5),
+                fillcolor="rgba(124, 58, 237, 0.18)",
+            )
+        )
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 10], gridcolor="#E2E8F0"),
+                angularaxis=dict(gridcolor="#E2E8F0"),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            showlegend=True,
+            legend=dict(
+                orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5
+            ),
+            margin=dict(t=20, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
         )
         st.plotly_chart(fig, use_container_width=True)
 
         # -------------------------------------------------------------------
-        # 💡 평가 기반 장점 및 보완점 자동 요약 표출 영역
+        # 💡 평가 기반 장점 및 보완점 자동 요약 표출 영역 (항목별 팀 평균 대비 비교 포함)
         # -------------------------------------------------------------------
         st.markdown("---")
         st.markdown(f"#### 📝 **[{selected_target}] 역량 진단 요약 리포트**")
+
+        overall_grade = calculate_grade(target_info["종합 평균점수"])
+        grade_desc = {
+            "S": "최우수 수준으로, 팀 내 최상위권 역량을 보유하고 있습니다.",
+            "A": "우수한 수준으로, 대부분의 항목에서 안정적인 역량을 보여주고 있습니다.",
+            "B": "숙련된 수준으로, 실무 수행에 무리가 없는 역량을 갖추고 있습니다.",
+            "C": "보통 수준으로, 일부 항목에 대한 보완 학습이 필요합니다.",
+            "D": "기초 수준으로, 핵심 항목에 대한 집중적인 육성이 필요합니다.",
+        }.get(overall_grade, "")
+        vs_team_word = "높은" if target_info["종합 평균점수"] >= team_avg_total else "낮은"
+        st.markdown(
+            f"종합 평가 등급은 **{overall_grade}등급**({grade_desc}) 이며, "
+            f"전체 {total_people}명 중 **{target_rank}위**, 팀 평균({team_avg_total}점)보다 "
+            f"**{abs(target_info['종합 평균점수'] - team_avg_total):.1f}점 {vs_team_word}** 수준입니다."
+        )
 
         item_scores_series = pd.Series({item: target_info[item] for item in ITEMS})
         sorted_scores = item_scores_series.sort_values(ascending=False)
@@ -1019,7 +1280,8 @@ with tab2:
             st.success("##### 🌟 주요 강점 요약")
             strengths_text = ""
             for idx, (it_name, it_score) in enumerate(top_items.items(), 1):
-                strengths_text += f"**{idx}. {it_name}** ({it_score}점)\n"
+                it_diff = round(it_score - team_avg_by_item[it_name], 1)
+                strengths_text += f"**{idx}. {it_name}** — {it_score}점 (팀 평균 대비 {it_diff:+.1f})\n"
             strengths_text += f"\n👉 해당 인원은 **{top_items.index[0]}** 및 **{top_items.index[1]}** 분야에서 상대적으로 우수한 역량을 보여주고 있습니다."
             st.markdown(strengths_text)
 
@@ -1027,9 +1289,30 @@ with tab2:
             st.info("##### 💡 보완 및 발전 제안")
             weaknesses_text = ""
             for idx, (it_name, it_score) in enumerate(bottom_items.items(), 1):
-                weaknesses_text += f"**{idx}. {it_name}** ({it_score}점)\n"
+                it_diff = round(it_score - team_avg_by_item[it_name], 1)
+                weaknesses_text += f"**{idx}. {it_name}** — {it_score}점 (팀 평균 대비 {it_diff:+.1f})\n"
             weaknesses_text += f"\n👉 향후 **{bottom_items.index[0]}** 영역을 중심으로 집중적인 직무 교육과 피드백을 통해 역량을 보완할 필요가 있습니다."
             st.markdown(weaknesses_text)
+
+        with st.expander("📊 항목별 점수 상세 비교 (팀 평균 대비)"):
+            compare_rows = []
+            for item in ITEMS:
+                my_score = round(target_info[item], 1)
+                team_score = round(team_avg_by_item[item], 1)
+                diff = round(my_score - team_score, 1)
+                compare_rows.append(
+                    {
+                        "평가 항목": item,
+                        f"{selected_target}": my_score,
+                        "전체 평균": team_score,
+                        "차이": f"{diff:+.1f}",
+                    }
+                )
+            compare_df = pd.DataFrame(compare_rows)
+            compare_html = compare_df.to_html(
+                index=False, escape=False, classes="styled-table"
+            )
+            st.markdown(CUSTOM_STYLE + compare_html, unsafe_allow_html=True)
 
         st.markdown("---")
 
