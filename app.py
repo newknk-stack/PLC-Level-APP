@@ -145,8 +145,17 @@ if not st.session_state["logged_in"] and not st.session_state["logout_triggered"
         st.session_state["logged_in"] = True
         st.session_state["user_name"] = saved_user
 
-# 평가 항목 (10선) 및 평가자/대상자 기본 정의
+# 평가 항목 (5선) 및 평가자/대상자 기본 정의
 ITEMS = [
+    "S/W 이해 및 제어 로직 분석력",
+    "상위 시스템 인터페이스 이해 및 연동 능력",
+    "코드 문제점 진단 및 개선 능력",
+    "트러블슈팅 및 장애 대응력",
+    "신기술 적용 및 향후 성장 가능성",
+]
+
+# 2026년 상반기까지 사용하던 예전 10개 항목 (구글 시트 마이그레이션용으로만 사용)
+LEGACY_ITEMS = [
     "S/W 이해 및 제어 분석",
     "상위 인터페이스 분석",
     "코드 문제점 및 개선점 발굴",
@@ -158,6 +167,23 @@ ITEMS = [
     "현장 업무 적용 가능성",
     "향후 개발 역량 발전성",
 ]
+
+# 신규 항목 → 예전 항목 매핑 (1~4번은 문구만 다듬은 동일 항목이라 그대로 이관,
+# 5번 "신기술 적용 및 향후 성장 가능성"은 가장 개념이 가까운 예전 10번
+# "향후 개발 역량 발전성" 점수를 그대로 이관한다)
+LEGACY_ITEM_MAP = {
+    "S/W 이해 및 제어 로직 분석력": "S/W 이해 및 제어 분석",
+    "상위 시스템 인터페이스 이해 및 연동 능력": "상위 인터페이스 분석",
+    "코드 문제점 진단 및 개선 능력": "코드 문제점 및 개선점 발굴",
+    "트러블슈팅 및 장애 대응력": "트러블 슈팅 대응 방안",
+    "신기술 적용 및 향후 성장 가능성": "향후 개발 역량 발전성",
+}
+
+# 항목별 점수(0~10점) 합계를 100점 만점 기준으로 환산하는 배율.
+# 항목이 10개(만점 100점)에서 5개(만점 50점)로 줄었지만, 등급 기준(S/A/B/C/D =
+# 90/80/70/60점)과 화면 표시는 기존처럼 "100점 만점" 기준을 그대로 유지하기로
+# 결정했기 때문에, 합산 점수는 항상 이 배율을 곱해 100점 만점으로 환산한다.
+SCORE_NORMALIZE_FACTOR = 100.0 / (len(ITEMS) * 10)
 
 EVALUATORS = ["정준영", "차영진", "김태환", "김남권", "최치웅", "김동우", "송지호"]
 
@@ -241,7 +267,7 @@ df_comp = load_competency_data()
 # 🎨 등급 계산 및 HTML 색상 함수
 # -------------------------------------------------------------------
 def calculate_grade(total_score):
-    """10개 항목 합산 점수(100점 만점) 기준 등급 산정"""
+    """항목 합산 점수(100점 만점 환산 기준) 기준 등급 산정"""
     if total_score >= 90.0:
         return "S"
     elif total_score >= 80.0:
@@ -297,7 +323,8 @@ def compute_dashboard_summary(df):
         eval_count = len(sub_df)
 
         item_means = sub_df[ITEMS].mean()
-        total_score = item_means.sum()
+        # 합산 점수는 100점 만점 기준으로 환산해서 등급을 산정한다.
+        total_score = item_means.sum() * SCORE_NORMALIZE_FACTOR
 
         est_grade = calculate_grade(total_score)
         pre_grade = get_pre_grade(target_person)
@@ -540,11 +567,67 @@ def save_dataframe_to_sheet(df):
     st.cache_data.clear()
 
 
+def migrate_legacy_items_if_needed():
+    """평가 항목이 10개 → 5개로 개편되면서, 예전 스키마(10개 항목)로 저장된
+    구글 시트 데이터를 새 스키마(5개 항목)로 1회성 변환한다.
+
+    변환 규칙 (사용자 확정):
+      - 1~4번 항목: 문구만 다듬은 동일 항목이라 예전 점수를 그대로 이관
+      - 5번 "신기술 적용 및 향후 성장 가능성": 예전 10번 "향후 개발 역량 발전성"
+        점수를 그대로 이관 (신기술 적용 측면은 예전에 별도로 평가한 적이 없어
+        가장 개념이 가까운 항목 점수로 대체)
+
+    이미 새 스키마로 변환되어 있으면 아무 것도 하지 않는다(멱등).
+    """
+    try:
+        sheet = get_worksheet()
+        records = sheet.get_all_records()
+        if not records:
+            return  # 저장된 평가 데이터가 없으면 변환할 것도 없음
+
+        raw_df = pd.DataFrame(records)
+
+        has_new_schema = all(item in raw_df.columns for item in ITEMS)
+        has_legacy_schema = any(item in raw_df.columns for item in LEGACY_ITEMS)
+
+        if has_new_schema and not has_legacy_schema:
+            return  # 이미 새 스키마로 변환 완료된 상태
+
+        if not has_legacy_schema:
+            # 예전 항목도 새 항목도 아닌 알 수 없는 컬럼 구조 -> 손대지 않음
+            return
+
+        new_rows = []
+        for _, row in raw_df.iterrows():
+            new_row = {
+                "evaluator": row.get("evaluator", ""),
+                "target": row.get("target", ""),
+            }
+            for new_item in ITEMS:
+                legacy_item = LEGACY_ITEM_MAP.get(new_item)
+                raw_val = row.get(legacy_item, 0) if legacy_item else 0
+                try:
+                    new_row[new_item] = float(raw_val) if str(raw_val) != "" else 0
+                except (ValueError, TypeError):
+                    new_row[new_item] = 0
+            new_rows.append(new_row)
+
+        new_df = pd.DataFrame(new_rows, columns=["evaluator", "target"] + ITEMS)
+        save_dataframe_to_sheet(new_df)
+    except Exception as e:
+        st.warning(f"평가 항목 스키마(10개→5개) 자동 변환 중 문제가 발생했습니다: {e}")
+
+
 # -------------------------------------------------------------------
 # 🛡️ 관리자 계정 설정 (평가 데이터 삭제/수정 권한)
 # -------------------------------------------------------------------
 ADMIN_USERS = ["김남권"]
 is_admin = st.session_state.get("user_name") in ADMIN_USERS
+
+# 평가 항목 스키마(10개→5개) 자동 변환은 세션당 한 번만 시도한다.
+if "legacy_items_migration_checked" not in st.session_state:
+    migrate_legacy_items_if_needed()
+    st.session_state["legacy_items_migration_checked"] = True
 
 
 # -------------------------------------------------------------------
@@ -766,7 +849,12 @@ with tab1:
 
     st.markdown("---")
 
-    current_total_score = float(np.sum(list(scores.values()))) if scores else 0.0
+    # 합산 점수는 100점 만점 기준으로 환산해서 등급을 산정하고 화면에 표시한다.
+    current_total_score = (
+        float(np.sum(list(scores.values()))) * SCORE_NORMALIZE_FACTOR
+        if scores
+        else 0.0
+    )
     current_est_grade = calculate_grade(current_total_score)
     current_pre_grade = get_pre_grade(target)
     colored_grade_display = get_colored_grade_html(
@@ -1012,7 +1100,10 @@ with tab3:
             inplace=True,
         )
 
-        display_df["합산 점수"] = display_df[ITEMS].sum(axis=1).round(1)
+        # 합산 점수는 100점 만점 기준으로 환산해서 등급을 산정하고 화면에 표시한다.
+        display_df["합산 점수"] = (
+            display_df[ITEMS].sum(axis=1) * SCORE_NORMALIZE_FACTOR
+        ).round(1)
         for item in ITEMS:
             display_df[item] = display_df[item].round(1)
 
@@ -1159,7 +1250,10 @@ if is_admin:
         else:
             for item in ITEMS:
                 df_admin[item] = pd.to_numeric(df_admin[item], errors="coerce").fillna(0)
-            df_admin["합산 점수"] = df_admin[ITEMS].sum(axis=1).round(1)
+            # 합산 점수는 100점 만점 기준으로 환산해서 표시한다.
+            df_admin["합산 점수"] = (
+                df_admin[ITEMS].sum(axis=1) * SCORE_NORMALIZE_FACTOR
+            ).round(1)
 
             st.markdown("#### 📋 전체 평가 데이터")
             st.dataframe(
