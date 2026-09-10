@@ -14,113 +14,150 @@ import streamlit as st
 st.set_page_config(page_title="PLC S/W 역량 진단 평가 툴", layout="wide")
 
 # -------------------------------------------------------------------
-# 🎨 탭, 테이블 및 버튼 디자인 커스텀 CSS (더 연하고 은은한 소프트 블루 톤 적용)
+# 🎨 UI 디자인 커스텀 CSS — "모던 SaaS 대시보드" 스타일
+# (카드형 레이아웃 + 부드러운 그림자, 바이올렛 포인트 컬러, 슬레이트 배경)
 # -------------------------------------------------------------------
-CUSTOM_STYLE = """
+ACCENT = "#7C3AED"          # 포인트 컬러 (바이올렛)
+ACCENT_DARK = "#6D28D9"
+ACCENT_SOFT = "#F5F3FF"     # 포인트 컬러의 아주 옅은 틴트 (배경용)
+ACCENT_SOFT_BORDER = "#EDE9FE"
+SURFACE = "#FFFFFF"
+SURFACE_MUTED = "#F8FAFC"   # 카드 내부의 은은한 구분 배경
+APP_BG = "#F1F5F9"          # 전체 배경(슬레이트)
+TEXT_MAIN = "#0F172A"
+TEXT_SUB = "#64748B"
+BORDER = "#E2E8F0"
+
+CUSTOM_STYLE = f"""
 <style>
-    /* 탭 네비게이션 컨테이너 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background-color: #F8FAFC;
-        padding: 10px 14px;
-        border-radius: 14px;
-        border: 1px solid #E2E8F0;
-    }
-    
-    /* 각 탭 버튼 기본 스타일 (부드러운 라운드 & 차분한 글자색) */
-    .stTabs [data-baseweb="tab"] {
-        height: 46px;
+    /* 전체 배경: 카드가 떠 보이도록 은은한 슬레이트 톤 */
+    .stApp {{
+        background-color: {APP_BG};
+    }}
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }}
+
+    /* 탭 네비게이션: 세그먼트(필) 스타일 트랙 */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 2px;
+        background-color: #E2E8F0;
+        padding: 4px;
+        border-radius: 12px;
+        border: none;
+        width: fit-content;
+    }}
+
+    /* 각 탭 버튼: 트랙 위에 놓인 투명 필 */
+    .stTabs [data-baseweb="tab"] {{
+        height: 42px;
         white-space: pre-wrap;
-        background-color: #FFFFFF;
-        border-radius: 10px;
+        background-color: transparent;
+        border-radius: 9px;
         gap: 8px;
-        padding: 0px 22px;
-        font-size: 0.95rem;
+        padding: 0px 20px;
+        font-size: 0.92rem;
         font-weight: 600;
-        color: #64748B;
-        border: 1px solid #E2E8F0;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+        color: {TEXT_SUB};
+        border: none;
+        transition: all 0.15s ease-in-out;
+    }}
 
-    /* 탭 마우스 호버 시 */
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: #F1F5F9;
-        color: #334155;
-        border-color: #CBD5E1;
-    }
+    .stTabs [data-baseweb="tab"]:hover {{
+        color: {TEXT_MAIN};
+    }}
 
-    /* 선택된 활성 탭 스타일 (눈이 편안한 은은한 소프트 파스텔 블루 톤) */
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%) !important;
-        color: #1E40AF !important;
-        border-color: #BFDBFE !important;
-        border-radius: 10px !important;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
-    }
-    
-    /* 스트림릿 기본 하단 인디케이터 제거 */
-    .stTabs [data-baseweb="tab-highlight"] {
+    /* 선택된 탭: 흰색 필 + 은은한 그림자 + 포인트 컬러 텍스트 */
+    .stTabs [aria-selected="true"] {{
+        background-color: {SURFACE} !important;
+        color: {ACCENT} !important;
+        border-radius: 9px !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.06);
+    }}
+
+    .stTabs [data-baseweb="tab-highlight"] {{
         display: none !important;
-    }
+    }}
 
-    /* 🎨 스트림릿 primary 버튼 스타일을 훨씬 더 옅고 부드러운 하늘색(Light Sky Blue)으로 커스텀 */
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%) !important;
-        color: #0369A1 !important;
-        border: 1px solid #7DD3FC !important;
+    /* primary 버튼: 바이올렛 솔리드 + 부드러운 컬러 그림자 */
+    div.stButton > button[kind="primary"] {{
+        background-color: {ACCENT} !important;
+        color: #FFFFFF !important;
+        border: none !important;
         border-radius: 10px !important;
-        box-shadow: 0 2px 6px rgba(125, 211, 252, 0.25);
-        transition: all 0.2s ease-in-out;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #BAE6FD 0%, #7DD3FC 100%) !important;
-        color: #0C4A6E !important;
-        border-color: #38BDF8 !important;
-        box-shadow: 0 4px 10px rgba(56, 189, 248, 0.35);
-    }
-
-    /* 기존 테이블 스타일 */
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 10px 0;
-        font-size: 0.85rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        border-radius: 8px;
-        overflow: hidden;
-        border: 1px solid #E2E8F0;
-    }
-    .styled-table thead tr {
-        background-color: #1E293B;
-        color: #FFFFFF;
-        text-align: center;
+        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
         font-weight: 600;
+        transition: all 0.15s ease-in-out;
+    }}
+    div.stButton > button[kind="primary"]:hover {{
+        background-color: {ACCENT_DARK} !important;
+        box-shadow: 0 6px 16px rgba(124, 58, 237, 0.36);
+    }}
+
+    /* 카드처럼 보이도록 입력 위젯들의 모서리를 둥글게 통일 */
+    div[data-baseweb="select"] > div,
+    .stTextInput input,
+    .stNumberInput input {{
+        border-radius: 10px !important;
+        border-color: {BORDER} !important;
+    }}
+
+    /* 메트릭: 옅은 카드 타일 느낌 */
+    [data-testid="stMetric"] {{
+        background-color: {SURFACE_MUTED};
+        border-radius: 12px;
+        padding: 14px 16px;
+        border: 1px solid {BORDER};
+    }}
+
+    /* 결과 표: 카드형 컨테이너 + 열 균등 폭 + 좌우 스크롤 없이 컨테이너 폭에 맞춤 */
+    .styled-table {{
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 10px 0;
+        font-size: 0.82rem;
+        font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.06);
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid {BORDER};
+    }}
+    .styled-table thead tr {{
+        background-color: {SURFACE_MUTED};
+        color: #334155;
+        text-align: center;
+        font-weight: 700;
         white-space: normal;
         word-break: keep-all;
-        line-height: 1.3;
-    }
-    .styled-table th {
+        overflow-wrap: break-word;
+        line-height: 1.35;
+    }}
+    .styled-table th {{
+        padding: 12px 8px;
+        text-align: center;
+        border-bottom: 1px solid {BORDER};
+    }}
+    .styled-table td {{
         padding: 10px 8px;
         text-align: center;
-        border-right: 1px solid #334155;
-    }
-    .styled-table th:last-child {
-        border-right: none;
-    }
-    .styled-table td {
-        padding: 8px 10px;
-        text-align: center;
-        border-bottom: 1px solid #E2E8F0;
+        border-bottom: 1px solid #F1F5F9;
         color: #334155;
-        white-space: nowrap;
-    }
-    .styled-table tbody tr:nth-of-type(even) {
-        background-color: #F8FAFC;
-    }
-    .styled-table tbody tr:hover {
-        background-color: #EEF2FF;
-    }
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+    }}
+    .styled-table tbody tr:last-child td {{
+        border-bottom: none;
+    }}
+    .styled-table tbody tr:nth-of-type(even) {{
+        background-color: #FAFAFC;
+    }}
+    .styled-table tbody tr:hover {{
+        background-color: {ACCENT_SOFT};
+    }}
 </style>
 """
 
@@ -432,7 +469,12 @@ if not st.session_state["logged_in"]:
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<h1 style="font-size: 2.7rem; font-weight: 800; padding-top: 0px; margin-top: 0px;">🔐 PLC S/W 역량 진단 평가 시스템</h1>',
+            '<div style="display: flex; align-items: center; gap: 14px; padding-top: 4px;">'
+            '<div style="flex: none; width: 44px; height: 44px; border-radius: 12px; background-color: #7C3AED; display: flex; align-items: center; justify-content: center;">'
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="1.5"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
+            '</div>'
+            '<h1 style="font-size: 2.4rem; font-weight: 800; color: #0F172A; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
+            '</div>',
             unsafe_allow_html=True,
         )
     with col_l_logo:
@@ -492,7 +534,12 @@ with col_title:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<h1 style="font-size: 2.7rem; font-weight: 800; padding-top: 0px; margin-top: 0px;">⚡ PLC S/W 역량 진단 평가 시스템</h1>',
+        '<div style="display: flex; align-items: center; gap: 14px; padding-top: 4px;">'
+        '<div style="flex: none; width: 44px; height: 44px; border-radius: 12px; background-color: #7C3AED; display: flex; align-items: center; justify-content: center;">'
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>'
+        '</div>'
+        '<h1 style="font-size: 2.4rem; font-weight: 800; color: #0F172A; padding: 0; margin: 0;">PLC S/W 역량 진단 평가 시스템</h1>'
+        '</div>',
         unsafe_allow_html=True,
     )
 with col_logo:
@@ -748,11 +795,12 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
+            # 바이올렛 톤 단일 색상 램프 (Level 3 -> 0 로 갈수록 옅어짐)
             raw_levels = [
-                ("Level 3", l3_p, "#5C5470", "white"),
-                ("Level 2", l2_p, "#7C83FD", "white"),
-                ("Level 1", l1_p, "#70A288", "white"),
-                ("Level 0", l0_p, "#D9B48F", "#333333"),
+                ("Level 3", l3_p, "#6D28D9", "white"),
+                ("Level 2", l2_p, "#8B5CF6", "white"),
+                ("Level 1", l1_p, "#C4B5FD", "#4C1D95"),
+                ("Level 0", l0_p, "#EDE9FE", "#6D28D9"),
             ]
 
             active_levels = [item for item in raw_levels if item[1] > 0]
@@ -880,11 +928,11 @@ with tab1:
     with btn_col1:
         st.markdown(
             f"""
-            <div style="background-color: #f8f9fa; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
+            <div style="background-color: #F5F3FF; padding: 10px 12px; border-radius: 12px; border: 1px solid #EDE9FE; text-align: center; height: 100%; min-height: 72px; display: flex; align-items: center; justify-content: center;">
                 <div style="white-space: nowrap;">
-                    <span style="font-size: 0.95rem; color: #555; margin-right: 8px;">기술평가 등급(역량 본인 평가):</span>
+                    <span style="font-size: 0.95rem; color: #475569; margin-right: 8px;">기술평가 등급(역량 본인 평가):</span>
                     <span style="font-size: 1.2rem;">{colored_grade_display}</span>
-                    <span style="font-size: 0.9rem; color: #888; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
+                    <span style="font-size: 0.9rem; color: #7C3AED; font-weight: 600; margin-left: 4px;">(합계 {current_total_score:.1f}점)</span>
                 </div>
             </div>
             """,
@@ -1256,11 +1304,18 @@ if is_admin:
             ).round(1)
 
             st.markdown("#### 📋 전체 평가 데이터")
-            st.dataframe(
-                df_admin.rename(columns={"evaluator": "평가자", "target": "평가 대상자"}),
-                use_container_width=True,
-                hide_index=True,
+            admin_display_df = df_admin.rename(
+                columns={"evaluator": "평가자", "target": "평가 대상자"}
             )
+            admin_column_order = ["평가자", "평가 대상자", "합산 점수"] + ITEMS
+            admin_display_df = admin_display_df[admin_column_order]
+            for item in ITEMS:
+                admin_display_df[item] = admin_display_df[item].round(1)
+
+            admin_html_table = admin_display_df.to_html(
+                index=False, escape=False, classes="styled-table"
+            )
+            st.markdown(CUSTOM_STYLE + admin_html_table, unsafe_allow_html=True)
 
             st.markdown("---")
             st.markdown("#### ✏️ 개별 평가 데이터 수정 / 삭제")
