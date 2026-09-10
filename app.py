@@ -161,8 +161,11 @@ CUSTOM_STYLE = f"""
         line-height: 1.3 !important;
         word-break: keep-all;
     }}
-    [data-testid="stMetricLabel"] {{
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricLabel"] p {{
         white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
     }}
 
     /* st.container(border=True) 카드: 흰 배경 + 둥근 모서리 + 은은한 그림자
@@ -524,6 +527,68 @@ def build_evaluation_excel(detail_df, dashboard_targets_df):
     return output.getvalue()
 
 
+def build_dashboard_excel(summary_df, download_df, raw_grades_list, team_avg_by_item, team_avg_total):
+    """TAB2(종합 평가 결과 대시보드) 화면에 표시되는 정보를 빠짐없이 하나의 엑셀
+    워크북으로 묶어서 반환한다.
+      1) 등급현황통계 — 화면 상단의 S/A/B/C/D 등급별 인원수
+      2) 종합평가결과 — 대상자별 종합 점수 표(항목별 평균점수 포함) + 팀 평균 대비 점수
+      3) 역량진단요약리포트 — 대상자별 순위, 등급, 팀 평균 대비, 강점/보완 Top3
+         (화면에서는 선택한 한 명만 보여주지만, 엑셀에는 전체 대상자를 다 담는다)
+    """
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # 1) 등급 현황 통계
+        grade_series = pd.Series(raw_grades_list)
+        grade_counts = grade_series.value_counts().reindex(
+            ["S", "A", "B", "C", "D"], fill_value=0
+        )
+        grade_stat_df = pd.DataFrame(
+            {
+                "등급": ["S", "A", "B", "C", "D"],
+                "인원수": [int(grade_counts[g]) for g in ["S", "A", "B", "C", "D"]],
+            }
+        )
+        grade_stat_df.to_excel(writer, sheet_name="등급현황통계", index=False)
+
+        # 2) 종합 평가 결과 표 (화면의 정렬 가능한 표 + 팀 평균 대비 컬럼 추가)
+        result_df = download_df.copy()
+        result_df["팀 평균 대비"] = (
+            result_df["종합 평균점수"] - team_avg_total
+        ).round(1)
+        result_df.to_excel(writer, sheet_name="종합평가결과", index=False)
+
+        # 3) 대상자별 역량 진단 요약 리포트 (전체 대상자 대상)
+        rank_df = summary_df.sort_values(
+            by=["종합 평균점수"], ascending=False
+        ).reset_index(drop=True)
+        report_rows = []
+        for rank_idx, row in rank_df.iterrows():
+            target_name = row["피평가자"]
+            item_scores = pd.Series({item: row[item] for item in ITEMS})
+            sorted_scores = item_scores.sort_values(ascending=False)
+            top_items = sorted_scores.head(3)
+            bottom_items = sorted_scores.tail(3).sort_values(ascending=True)
+
+            report_row = {
+                "피평가자": target_name,
+                "순위": rank_idx + 1,
+                "종합 평균점수": row["종합 평균점수"],
+                "등급": calculate_grade(row["종합 평균점수"]),
+                "팀 평균 대비": round(row["종합 평균점수"] - team_avg_total, 1),
+            }
+            for idx, (it_name, it_score) in enumerate(top_items.items(), 1):
+                report_row[f"강점{idx}"] = f"{it_name} ({it_score}점)"
+            for idx, (it_name, it_score) in enumerate(bottom_items.items(), 1):
+                report_row[f"보완{idx}"] = f"{it_name} ({it_score}점)"
+            report_rows.append(report_row)
+
+        report_df = pd.DataFrame(report_rows)
+        report_df.to_excel(writer, sheet_name="역량진단요약리포트", index=False)
+
+    output.seek(0)
+    return output.getvalue()
+
+
 # -------------------------------------------------------------------
 # 🔐 로그인 화면 — 중앙 정렬 카드형 레이아웃
 # -------------------------------------------------------------------
@@ -761,17 +826,160 @@ def set_evaluator_confirmation(evaluator, confirmed):
     load_confirmations.clear()
 
 
-def get_evaluator_progress_status(evaluator_name, all_data_df, confirmations):
-    """평가자 한 명의 진행 상태를 '평가중' / '평가완료' / '평가확정' 3단계로 계산한다."""
+def get_evaluator_progress_status(evaluator_name, all_data_df, confirmations, exclusions=None):
+    """평가자 한 명의 진행 상태를 '평가중' / '평가완료' / '평가확정' 3단계로 계산한다.
+    '평가완료'는 대상자 전원이 (평가 제출 완료) 또는 (평가 미적용 처리) 중 하나로
+    빠짐없이 처리되었을 때를 의미한다."""
     if confirmations.get(evaluator_name, {}).get("confirmed"):
         return "평가확정"
     if not all_data_df.empty and "evaluator" in all_data_df.columns:
-        done_count = len(all_data_df[all_data_df["evaluator"] == evaluator_name])
+        done_targets = set(
+            all_data_df[all_data_df["evaluator"] == evaluator_name]["target"].tolist()
+        )
     else:
-        done_count = 0
-    if done_count >= len(TARGETS):
+        done_targets = set()
+    excluded_targets = (exclusions or {}).get(evaluator_name, set())
+    handled_count = len(done_targets | excluded_targets)
+    if handled_count >= len(TARGETS):
         return "평가완료"
     return "평가중"
+
+
+# -------------------------------------------------------------------
+# 🚫 평가 미적용 대상자 ("exclusions" 시트: evaluator, target, excluded_at)
+# 평가자가 [평가 확정]을 누를 때 아직 평가하지 않은 대상자가 있으면, 그중
+# 실제로 평가가 필요 없는 인원을 "평가 미적용"으로 표시해둘 수 있다.
+# 대상자 전원이 (평가 제출 완료) 또는 (평가 미적용) 상태가 되어야
+# 최종 확정이 가능하다.
+# -------------------------------------------------------------------
+def get_exclusion_worksheet():
+    return get_or_create_worksheet(
+        "exclusions", ["evaluator", "target", "excluded_at"]
+    )
+
+
+@st.cache_data(ttl=10)
+def load_exclusions():
+    """평가자별로 '평가 미적용' 처리된 대상자 이름 집합을 돌려준다."""
+    try:
+        ws = get_exclusion_worksheet()
+        records = ws.get_all_records()
+        result = {}
+        for r in records:
+            _ev = r.get("evaluator", "")
+            _tg = r.get("target", "")
+            if not _ev or not _tg:
+                continue
+            result.setdefault(_ev, set()).add(_tg)
+        return result
+    except Exception:
+        return {}
+
+
+def set_targets_exclusion(evaluator, targets, excluded=True):
+    """지정한 평가자에 대해 여러 대상자를 한 번에 '평가 미적용' 처리하거나
+    해제한다. (확정 다이얼로그의 일괄 선택 / 개별 되돌리기 기능에서 사용)"""
+    if not targets:
+        return
+    ws = get_exclusion_worksheet()
+    records = ws.get_all_records()
+
+    if excluded:
+        already = {
+            r.get("target") for r in records if r.get("evaluator") == evaluator
+        }
+        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+        new_rows = [[evaluator, t, now_str] for t in targets if t not in already]
+        if new_rows:
+            ws.append_rows(new_rows)
+    else:
+        keep_rows = [
+            [r.get("evaluator", ""), r.get("target", ""), r.get("excluded_at", "")]
+            for r in records
+            if not (r.get("evaluator") == evaluator and r.get("target") in targets)
+        ]
+        ws.clear()
+        ws.update([["evaluator", "target", "excluded_at"]] + keep_rows)
+
+    load_exclusions.clear()
+
+
+@st.dialog("⚠️ 미평가 대상자 확인")
+def show_unevaluated_confirm_dialog(evaluator_name, all_targets, completed_targets_set):
+    """[평가 확정] 버튼을 눌렀을 때 아직 평가하지 않은 대상자가 있으면 열리는
+    창. 평가가 필요 없는 인원은 체크박스로 선택해 '평가 미적용' 처리할 수
+    있고, 전체를 한 번에 선택하는 일괄 버튼도 제공한다. 대상자 전원이
+    평가완료 또는 평가미적용으로 처리되어야 실제 확정까지 진행된다."""
+    _current_exclusions = load_exclusions().get(evaluator_name, set())
+    _not_evaluated = [
+        t
+        for t in all_targets
+        if t not in completed_targets_set and t not in _current_exclusions
+    ]
+
+    if not _not_evaluated:
+        st.success("모든 대상자가 평가완료 또는 평가미적용으로 처리되었습니다.")
+        if st.button("✅ 확정하기", type="primary", key=f"dlg_finalize_{evaluator_name}"):
+            set_evaluator_confirmation(evaluator_name, True)
+            st.rerun()
+        return
+
+    st.write(
+        f"**[{evaluator_name}]** 평가자가 아직 평가하지 않은 대상자가 "
+        f"**{len(_not_evaluated)}명** 있습니다. 평가가 필요 없는 인원은 아래에서 "
+        "선택해 **평가 미적용**으로 표시할 수 있습니다. 대상자 전원이 평가완료 "
+        "또는 평가미적용으로 처리되어야 최종 확정할 수 있습니다."
+    )
+
+    _dlg_c1, _dlg_c2 = st.columns(2)
+    with _dlg_c1:
+        if st.button(
+            "☑️ 전체 일괄 평가 미적용 선택",
+            key=f"dlg_selall_{evaluator_name}",
+            use_container_width=True,
+        ):
+            for _t in _not_evaluated:
+                st.session_state[f"dlg_excl_{evaluator_name}_{_t}"] = True
+    with _dlg_c2:
+        if st.button(
+            "선택 해제", key=f"dlg_clrall_{evaluator_name}", use_container_width=True
+        ):
+            for _t in _not_evaluated:
+                st.session_state[f"dlg_excl_{evaluator_name}_{_t}"] = False
+
+    st.markdown("---")
+    _selected = []
+    for _t in _not_evaluated:
+        if st.checkbox(_t, key=f"dlg_excl_{evaluator_name}_{_t}"):
+            _selected.append(_t)
+
+    st.markdown("---")
+    _will_remain = [t for t in _not_evaluated if t not in _selected]
+    _apply_label = (
+        "선택 인원 평가 미적용 처리 후 확정"
+        if not _will_remain
+        else f"선택 인원({len(_selected)}명) 평가 미적용 처리"
+    )
+    _apply_c1, _apply_c2 = st.columns(2)
+    with _apply_c1:
+        if st.button(
+            _apply_label,
+            type="primary",
+            key=f"dlg_apply_{evaluator_name}",
+            use_container_width=True,
+            disabled=(len(_selected) == 0),
+        ):
+            set_targets_exclusion(evaluator_name, _selected, excluded=True)
+            if not _will_remain:
+                set_evaluator_confirmation(evaluator_name, True)
+                st.rerun()
+            # 아직 남은 인원이 있으면 다이얼로그를 닫지 않고, 방금 처리한
+            # 인원이 빠진 최신 목록으로 다시 그려질 수 있도록 그대로 둔다.
+    with _apply_c2:
+        if st.button(
+            "닫기", key=f"dlg_close_{evaluator_name}", use_container_width=True
+        ):
+            st.rerun()
 
 
 # -------------------------------------------------------------------
@@ -866,17 +1074,17 @@ if "legacy_items_migration_checked" not in st.session_state:
 # -------------------------------------------------------------------
 MANUAL_TEXT = """
 - **로그인**: 이름 선택 + 공동 비밀번호 입력 (접속마다 매번 로그인, 자동 로그인 없음)
-- **📝 평가 입력**: 대상자 선택 → 5개 항목 0~10점 입력 → [점수 저장 및 제출]. 완료한 대상자는 "✅ 평가 완료"로 표시되고, 다시 선택하면 기존 점수를 불러와 수정할 수 있습니다.
-- **✅ 최종 확정**: 모든 대상자를 다 평가하면 평가 입력 탭 하단에서 진행률을 확인하고 [평가 확정] 버튼을 누를 수 있습니다(확정 취소도 가능).
-- **📊 대시보드**: 등급 통계, 종합 점수 표, 방사형 차트(전체 평균 비교), 역량 요약 리포트, CSV 다운로드
+- **🟢 평가자 접속 · 진행 현황**: 사이드바에서 모든 평가자의 현재 접속 여부(●)와 진행 상태(평가중/평가완료/평가확정)를 한 줄씩 실시간으로 확인할 수 있습니다.
+- **📝 평가 입력**: 대상자 선택 → 5개 항목 0~10점 입력 → [점수 저장 및 제출]. 완료한 대상자는 "✅ 평가 완료"로 표시되고, 다시 선택하면 기존 점수를 불러와 수정하거나, 펼침 메뉴에서 본인이 제출한 평가를 삭제할 수 있습니다(다른 평가자의 데이터는 삭제 불가).
+- **✅ 최종 확정**: 평가 입력 탭 하단에서 [평가 확정]을 누르면, 아직 평가하지 않은 대상자가 있을 때 안내 창이 열립니다. 평가가 필요 없는 인원은 거기서 개별 또는 일괄로 "평가 미적용" 처리할 수 있고, 전원이 평가완료·평가미적용 중 하나로 정리되면 확정됩니다(확정 취소, 미적용 되돌리기도 가능).
+- **📊 대시보드**: 등급 통계, 종합 점수 표, 방사형 차트(전체 평균 비교), 역량 요약 리포트, 엑셀 다운로드(전체 대상자 정보 포함)
 - **🔍 상세 조회**: 평가자·대상자별 검색/정렬(평가자순·대상자순·등급순), 엑셀 다운로드
 - **💬 채팅방**: 사이드바에서 다른 접속자와 간단한 메시지를 주고받을 수 있습니다.
 """
 
 ADMIN_MANUAL_TEXT = """
 **🛡️ 관리자 전용 (김남권 계정)**
-- 사이드바: 현재 접속 중인 평가자 + 평가자별 진행 현황(평가중 / 평가완료 / 평가확정) 실시간 확인
-- [🛠️ 관리자] 탭: 평가자·대상자 필터 + 이름 검색, 점수 직접 수정·삭제 (삭제는 확인 체크박스 선택 후 가능)
+- [🛠️ 관리자] 탭: 평가자·대상자 필터 + 이름 검색, 모든 평가자의 점수를 직접 수정·삭제 (삭제는 확인 체크박스 선택 후 가능)
 """
 
 CHANGELOG = [
@@ -932,6 +1140,22 @@ CHANGELOG = [
         "title": "접속자 간 채팅방 기능 추가",
         "desc": "사이드바에서 접속 중인 평가자들과 간단한 메시지를 주고받을 수 있는 채팅 기능을 추가했습니다.",
     },
+    {
+        "title": "선택창(드롭다운) 대비 문제 재수정",
+        "desc": "선택창 배경이 페이지 배경과 완전히 같은 색이라 안 보이던 문제의 실제 원인을 찾아 수정했습니다. 로그인 화면 포함 전체 선택창에 적용됩니다.",
+    },
+    {
+        "title": "역량 수준별 분포 현황 삭제 + 종합 평가 결과 엑셀 다운로드 개편",
+        "desc": "평가 입력 화면의 사전 진단 카드에서 '역량 수준별 분포 현황' 막대그래프를 제거했습니다. 종합 평가 결과 대시보드(탭2)의 다운로드를 CSV에서 엑셀로 바꾸고, 등급현황통계/종합평가결과/역량진단요약리포트(전체 대상자) 3개 시트에 화면의 모든 정보를 담도록 개편했습니다.",
+    },
+    {
+        "title": "평가 확정 방식 개선 (평가 미적용 처리) + 본인 평가 삭제 기능 추가",
+        "desc": "[평가 확정] 버튼이 전원 평가 완료 전에도 누를 수 있도록 바뀌었습니다. 누르면 아직 평가하지 않은 대상자 안내 창이 열리고, 평가가 필요 없는 인원은 개별 선택 또는 일괄 선택으로 '평가 미적용' 처리할 수 있습니다(나중에 되돌리기 가능). 또한 평가 입력 화면에서 본인이 제출한 평가에 한해 직접 삭제할 수 있는 기능을 추가했습니다(다른 평가자의 데이터는 삭제 불가, 관리자는 기존처럼 전체 데이터 수정/삭제 권한 유지).",
+    },
+    {
+        "title": "평가자 접속·진행 현황을 전체 공개 + 통합 표시",
+        "desc": "그동안 관리자에게만 보이던 '현재 접속 중인 평가자'와 '평가자별 진행 현황'을 모든 로그인 사용자가 사이드바에서 볼 수 있도록 바꿨습니다. 두 목록을 평가자 한 명당 한 줄(접속 여부 ● + 이름 + 진행 상태 뱃지)로 통합했습니다.",
+    },
 ]
 
 
@@ -941,44 +1165,41 @@ CHANGELOG = [
 st.sidebar.markdown("### 👤 접속자 정보")
 st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 
-if is_admin:
-    st.sidebar.markdown("#### 🟢 현재 접속 중인 평가자")
-    _active_now = _get_currently_active_evaluators()
-    if _active_now:
-        for _name in _active_now:
-            _tag = " · 관리자" if _name in ADMIN_USERS else ""
-            st.sidebar.markdown(
-                f'<div style="display:flex;align-items:center;gap:7px;'
-                f'font-size:0.85rem;color:#334155;padding:2px 0;">'
-                f'<span style="width:8px;height:8px;border-radius:50%;'
-                f'background:#22C55E;display:inline-block;flex-shrink:0;"></span>'
-                f'{_name}{_tag}</div>',
-                unsafe_allow_html=True,
-            )
-    else:
-        st.sidebar.caption("현재 접속 중인 평가자가 없습니다.")
-    st.sidebar.caption("※ 5분 이상 활동이 없으면 자동으로 제외됩니다.")
-
-    st.sidebar.markdown("#### 📋 평가자별 진행 현황")
-    _progress_data_df = load_data()
-    _confirmations = load_confirmations()
-    _status_style = {
-        "평가확정": ("#22C55E", "#FFFFFF"),
-        "평가완료": ("#7C3AED", "#FFFFFF"),
-        "평가중": ("#E2E8F0", "#475569"),
-    }
-    for _ev in EVALUATORS:
-        _status = get_evaluator_progress_status(_ev, _progress_data_df, _confirmations)
-        _bg, _fg = _status_style[_status]
-        st.sidebar.markdown(
-            f'<div style="display:flex;align-items:center;justify-content:space-between;'
-            f'padding:3px 0;font-size:0.83rem;color:#334155;">'
-            f'<span>{_ev}</span>'
-            f'<span style="background:{_bg};color:{_fg};font-size:0.7rem;font-weight:700;'
-            f'padding:2px 8px;border-radius:999px;">{_status}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+# ---------------------------------------------------------------
+# 🟢 평가자 접속 · 진행 현황 — 모든 로그인 사용자에게 공개.
+# "현재 접속 중인지"와 "평가 진행 상태(평가중/평가완료/평가확정)"를
+# 평가자 한 명당 한 줄로 합쳐서 보여준다.
+# ---------------------------------------------------------------
+st.sidebar.markdown("#### 🟢 평가자 접속 · 진행 현황")
+_active_now = _get_currently_active_evaluators()
+_progress_data_df = load_data()
+_confirmations = load_confirmations()
+_sidebar_exclusions = load_exclusions()
+_status_style = {
+    "평가확정": ("#22C55E", "#FFFFFF"),
+    "평가완료": ("#7C3AED", "#FFFFFF"),
+    "평가중": ("#E2E8F0", "#475569"),
+}
+for _ev in EVALUATORS:
+    _status = get_evaluator_progress_status(
+        _ev, _progress_data_df, _confirmations, _sidebar_exclusions
+    )
+    _bg, _fg = _status_style[_status]
+    _is_online = _ev in _active_now
+    _dot_color = "#22C55E" if _is_online else "#CBD5E1"
+    _tag = " · 관리자" if _ev in ADMIN_USERS else ""
+    st.sidebar.markdown(
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'padding:3px 0;font-size:0.83rem;color:#334155;">'
+        f'<span style="display:flex;align-items:center;gap:6px;">'
+        f'<span style="width:8px;height:8px;border-radius:50%;background:{_dot_color};'
+        f'display:inline-block;flex-shrink:0;"></span>{_ev}{_tag}</span>'
+        f'<span style="background:{_bg};color:{_fg};font-size:0.7rem;font-weight:700;'
+        f'padding:2px 8px;border-radius:999px;">{_status}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+st.sidebar.caption("※ 초록 점(●)은 현재 접속 중이라는 표시이며, 5분 이상 활동이 없으면 자동으로 꺼집니다.")
 
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
     _clear_active_session(st.session_state.get("user_name"))
@@ -1176,88 +1397,6 @@ with tab1:
                     delta_color="inverse",
                 )
 
-                l0_p = t_info["L0_pct"]
-                l1_p = t_info["L1_pct"]
-                l2_p = t_info["L2_pct"]
-                l3_p = t_info["L3_pct"]
-
-                st.markdown(
-                    f"<div style='font-size: 0.85rem; color: #666; margin-top: 10px; margin-bottom: 4px;'>"
-                    f"<b>역량 수준별 분포 현황</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
-                    f"<span style='color: #888;'>Level 3(전문가): {l3_p}% &nbsp;|&nbsp; Level 2(우수/숙련): {l2_p}% &nbsp;|&nbsp; Level 1(보통/실전): {l1_p}% &nbsp;|&nbsp; Level 0(기초/미흡): {l0_p}%</span>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-
-                # 바이올렛 톤 단일 색상 램프 (Level 3 -> 0 로 갈수록 옅어짐)
-                raw_levels = [
-                    ("Level 3", l3_p, "#6D28D9", "white"),
-                    ("Level 2", l2_p, "#A78BFA", "white"),
-                    ("Level 1", l1_p, "#DDD6FE", "#4C1D95"),
-                    ("Level 0", l0_p, "#F5F3FF", "#6D28D9"),
-                ]
-
-                active_levels = [item for item in raw_levels if item[1] > 0]
-
-                min_width = 8.0
-                chart_data = []
-
-                if active_levels:
-                    visual_widths = [
-                        max(val, min_width) for _, val, _, _ in active_levels
-                    ]
-                    sum_v_w = sum(visual_widths)
-                    norm_widths = [(w / sum_v_w) * 100 for w in visual_widths]
-
-                    for (lbl, val, color, text_color), n_w in zip(
-                        active_levels, norm_widths
-                    ):
-                        text_str = f"<b>{lbl} ({val}%)</b>"
-                        chart_data.append(
-                            (lbl, val, n_w, color, text_color, text_str)
-                        )
-
-                fig_bar = go.Figure()
-
-                for lbl, val, vis_w, color, text_color, text_str in chart_data:
-                    fig_bar.add_trace(
-                        go.Bar(
-                            y=["분포"],
-                            x=[vis_w],
-                            name=lbl,
-                            orientation="h",
-                            marker=dict(color=color),
-                            text=text_str,
-                            textposition="inside",
-                            textfont=dict(
-                                color=text_color, size=12, family="sans-serif"
-                            ),
-                            hovertemplate=f"{lbl}: {val}%<extra></extra>",
-                        )
-                    )
-
-                fig_bar.update_layout(
-                    barmode="stack",
-                    xaxis=dict(
-                        range=[0, 100],
-                        showgrid=False,
-                        showticklabels=False,
-                        zeroline=False,
-                    ),
-                    yaxis=dict(showgrid=False, showticklabels=False),
-                    margin=dict(l=0, r=0, t=0, b=0),
-                    height=32,
-                    showlegend=False,
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                )
-
-                st.plotly_chart(
-                    fig_bar,
-                    use_container_width=True,
-                    config={"displayModeBar": False},
-                )
-
     with st.container(border=True):
         st.markdown("**📝 항목별 점수 입력** (0점 ~ 10점)")
         if target in completed_targets:
@@ -1368,6 +1507,44 @@ with tab1:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
 
     # ---------------------------------------------------------------
+    # 🗑️ 내가 제출한 평가 삭제 — 본인이 등록한 평가 데이터에 한해서만
+    # 삭제할 수 있다 (다른 평가자의 데이터는 삭제 불가). 관리자는 이와
+    # 별도로 [🛠️ 관리자] 탭에서 모든 평가자의 데이터를 수정/삭제할 수 있다.
+    # ---------------------------------------------------------------
+    if existing_row is not None:
+        with st.expander(f"🗑️ [{target}] 대상자에 대한 내 평가 삭제하기"):
+            st.caption(
+                f"본인([{evaluator}])이 [{target}] 대상자에 대해 제출한 평가 데이터만 "
+                "삭제됩니다. 다른 평가자가 제출한 평가는 삭제할 수 없습니다."
+            )
+            _my_confirm_delete = st.checkbox(
+                "⚠️ 삭제를 확인합니다 (되돌릴 수 없습니다)",
+                key=f"my_confirm_del_{evaluator}_{target}",
+            )
+            if st.button(
+                "🗑️ 이 평가 삭제",
+                key=f"my_delete_btn_{evaluator}_{target}",
+                disabled=not _my_confirm_delete,
+            ):
+                try:
+                    df_my_del = load_data()
+                    my_del_idx = df_my_del[
+                        (df_my_del["evaluator"] == evaluator)
+                        & (df_my_del["target"] == target)
+                    ].index
+                    if len(my_del_idx) > 0:
+                        df_my_del = df_my_del.drop(my_del_idx)
+                        save_dataframe_to_sheet(df_my_del)
+                        st.session_state["save_flash_message"] = (
+                            f"[{evaluator}] 평가자의 [{target}] 대상자에 대한 평가가 삭제되었습니다."
+                        )
+                        st.rerun()
+                    else:
+                        st.warning("이미 삭제되었거나 데이터를 찾을 수 없습니다.")
+                except Exception as e:
+                    st.error(f"삭제 중 오류가 발생했습니다: {e}")
+
+    # ---------------------------------------------------------------
     # 📋 내 평가 현황 모니터링 + 최종 확정
     # 평가자가 본인이 지금까지 제출한 평가 결과를 한눈에 확인하고,
     # 모든 대상자에 대한 평가를 마쳤을 때 "최종 확정"을 누를 수 있게 한다.
@@ -1382,13 +1559,26 @@ with tab1:
         _my_confirmed_info = _my_confirmations.get(evaluator, {})
         _my_confirmed = _my_confirmed_info.get("confirmed", False)
 
+        _my_exclusions_set = load_exclusions().get(evaluator, set())
         _my_done_count = len(completed_targets)
-        _my_total_count = len(TARGETS)
-        _my_progress = _my_done_count / _my_total_count if _my_total_count else 0
-
-        st.progress(
-            _my_progress, text=f"{_my_done_count} / {_my_total_count}명 평가 완료"
+        _my_excluded_count = len(
+            [t for t in _my_exclusions_set if t in TARGETS]
         )
+        _my_total_count = len(TARGETS)
+        _my_not_evaluated = [
+            t
+            for t in TARGETS
+            if t not in completed_targets and t not in _my_exclusions_set
+        ]
+        _my_handled_count = _my_total_count - len(_my_not_evaluated)
+        _my_progress = _my_handled_count / _my_total_count if _my_total_count else 0
+
+        _my_progress_text = f"{_my_handled_count} / {_my_total_count}명 처리 완료"
+        if _my_excluded_count:
+            _my_progress_text += (
+                f"  (평가완료 {_my_done_count}명 · 평가미적용 {_my_excluded_count}명)"
+            )
+        st.progress(_my_progress, text=_my_progress_text)
 
         if completed_rows_by_target:
             _my_summary_rows = []
@@ -1413,22 +1603,39 @@ with tab1:
                 )
                 st.markdown(CUSTOM_STYLE + _my_html, unsafe_allow_html=True)
 
+        if _my_exclusions_set:
+            with st.expander(f"🚫 평가 미적용으로 표시한 인원 보기 ({len(_my_exclusions_set)}명)"):
+                for _excl_t in sorted(_my_exclusions_set):
+                    _excl_c1, _excl_c2 = st.columns([3, 1])
+                    _excl_c1.write(f"• {_excl_t}")
+                    if _excl_c2.button(
+                        "되돌리기", key=f"undo_excl_{evaluator}_{_excl_t}"
+                    ):
+                        set_targets_exclusion(evaluator, [_excl_t], excluded=False)
+                        st.rerun()
+
         if _my_confirmed:
             st.success(f"✅ 평가확정 완료 ({_my_confirmed_info.get('confirmed_at', '')})")
             if st.button("🔓 확정 취소", key="unconfirm_btn"):
                 set_evaluator_confirmation(evaluator, False)
                 st.rerun()
         else:
-            if _my_done_count >= _my_total_count and _my_total_count > 0:
-                st.info("모든 대상자에 대한 평가를 완료하셨습니다. 최종 결과를 확인하신 후 확정해 주세요.")
-                if st.button("✅ 평가 확정", type="primary", key="confirm_btn"):
+            if _my_not_evaluated:
+                st.caption(
+                    f"전체 {_my_total_count}명 중 {len(_my_not_evaluated)}명이 아직 평가되지 않았습니다. "
+                    "[평가 확정]을 누르면 미평가 대상자를 확인하고, 평가가 필요 없는 인원은 "
+                    "'평가 미적용'으로 표시할 수 있습니다."
+                )
+            else:
+                st.info("모든 대상자가 평가완료 상태입니다. 최종 결과를 확인하신 후 확정해 주세요.")
+            if st.button("✅ 평가 확정", type="primary", key="confirm_btn"):
+                if _my_not_evaluated:
+                    show_unevaluated_confirm_dialog(
+                        evaluator, TARGETS, set(completed_targets)
+                    )
+                else:
                     set_evaluator_confirmation(evaluator, True)
                     st.rerun()
-            else:
-                st.caption(
-                    f"전체 {_my_total_count}명 중 {_my_total_count - _my_done_count}명의 평가가 남아있습니다. "
-                    "모든 대상자를 평가하면 확정할 수 있습니다."
-                )
 
 # -------------------------------------------------------------------
 # TAB 2: 종합 평가 결과 대시보드
@@ -1612,11 +1819,18 @@ with tab2:
 
         st.markdown("---")
 
+        st.caption(
+            "'등급현황통계' / '종합평가결과'(팀 평균 대비 포함) / '역량진단요약리포트'"
+            "(전체 대상자 강점·보완점) 3개 시트에 이 화면의 모든 정보가 담겨 있습니다."
+        )
+        dashboard_excel_bytes = build_dashboard_excel(
+            summary_df, download_df, raw_grades_list, team_avg_by_item, team_avg_total
+        )
         st.download_button(
-            label="📥 평가 집계 결과 엑셀(CSV) 다운로드",
-            data=download_df.to_csv(index=False).encode("utf-8-sig"),
-            file_name="PLC_Software_역량진단_결과.csv",
-            mime="text/csv",
+            label="📥 종합 평가 결과 엑셀 다운로드",
+            data=dashboard_excel_bytes,
+            file_name="PLC_Software_역량진단_종합평가결과.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
 # -------------------------------------------------------------------
@@ -1650,8 +1864,11 @@ with tab3:
             if not df.empty
             else []
         )
+        sel_evaluator_exclusions = load_exclusions().get(sel_evaluator, set())
         not_evaluated_targets = [
-            t for t in TARGETS if t not in evaluated_targets
+            t
+            for t in TARGETS
+            if t not in evaluated_targets and t not in sel_evaluator_exclusions
         ]
 
         st.markdown("---")
@@ -1661,6 +1878,8 @@ with tab3:
             f"{len(evaluated_targets)} / {len(TARGETS)} 명",
         )
         m_col2.metric("남은 미평가 인원", f"{len(not_evaluated_targets)} 명")
+        if sel_evaluator_exclusions:
+            st.caption(f"※ 평가 미적용으로 표시된 {len(sel_evaluator_exclusions)}명은 미평가 인원에서 제외했습니다.")
 
         if not_evaluated_targets:
             with st.expander(
@@ -1676,7 +1895,7 @@ with tab3:
                         cols[j].write(f"• {target_name}")
         else:
             st.success(
-                f"🎉 [{sel_evaluator}] 평가자는 모든 대상자에 대한 평가를 완료했습니다!"
+                f"🎉 [{sel_evaluator}] 평가자는 모든 대상자에 대한 평가를 완료했습니다! (평가완료 + 평가미적용 기준)"
             )
         st.markdown("---")
 
