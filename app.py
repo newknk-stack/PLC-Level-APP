@@ -1,3 +1,4 @@
+import html
 import time
 from io import BytesIO
 
@@ -93,20 +94,49 @@ CUSTOM_STYLE = f"""
         box-shadow: 0 6px 16px rgba(124, 58, 237, 0.36);
     }}
 
-    /* 카드처럼 보이도록 입력 위젯들의 모서리를 둥글게 통일 */
-    div[data-baseweb="select"] > div,
+    /* 선택 박스 / 입력창: 카드(흰 배경)와 구분되도록 은은한 배경 + 뚜렷한 테두리를 준다.
+       (배경색과 선택 칸이 비슷해서 구분이 안 된다는 피드백 반영 — 로그인 화면 포함 전체 적용) */
+    div[data-baseweb="select"] > div {{
+        background-color: {SURFACE_MUTED} !important;
+        border-radius: 10px !important;
+        border: 1.5px solid {BORDER} !important;
+    }}
+    div[data-baseweb="select"] > div:hover {{
+        border-color: {ACCENT} !important;
+    }}
+    div[data-baseweb="popover"] li {{
+        background-color: {SURFACE} !important;
+    }}
     .stTextInput input,
     .stNumberInput input {{
+        background-color: {SURFACE_MUTED} !important;
         border-radius: 10px !important;
-        border-color: {BORDER} !important;
+        border: 1.5px solid {BORDER} !important;
+    }}
+    .stTextInput input:focus,
+    .stNumberInput input:focus {{
+        border-color: {ACCENT} !important;
+        box-shadow: 0 0 0 1px {ACCENT} !important;
     }}
 
-    /* 메트릭: 옅은 카드 타일 느낌 */
+    /* 메트릭: 옅은 카드 타일 느낌 + 값이 길어도 잘리지 않고 줄바꿈되도록 처리
+       ("C등급 (보통)" 같은 값이 좁은 칸에서 말줄임(...)으로 잘리는 문제 수정) */
     [data-testid="stMetric"] {{
         background-color: {SURFACE_MUTED};
         border-radius: 12px;
         padding: 14px 16px;
         border: 1px solid {BORDER};
+    }}
+    [data-testid="stMetricValue"] {{
+        font-size: 1.15rem !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        line-height: 1.3 !important;
+        word-break: keep-all;
+    }}
+    [data-testid="stMetricLabel"] {{
+        white-space: normal !important;
     }}
 
     /* st.container(border=True) 카드: 흰 배경 + 둥근 모서리 + 은은한 그림자
@@ -582,145 +612,6 @@ _touch_active_session(st.session_state.get("user_name"))
 
 
 # -------------------------------------------------------------------
-# 📚 사이드바 콘텐츠 — 시스템 사용 매뉴얼 / 업데이트 내역 (관리자 전용 항목 포함)
-# -------------------------------------------------------------------
-MANUAL_TEXT = """
-**1. 로그인**
-본인 이름을 선택하고 공동 비밀번호를 입력하면 접속됩니다. 접속할 때마다 매번 로그인해야 하며(자동 로그인 없음), 다른 기기·브라우저에서 접속해도 동일합니다.
-
-**2. 📝 평가 입력**
-평가 대상자를 선택하면 사전 진단 참고 현황(있는 경우)이 표시됩니다. 5개 항목에 대해 0~10점으로 점수를 입력하고 [점수 저장 및 제출]을 누르면 즉시 저장됩니다. 이미 평가를 완료한 대상자는 목록에 "✅ 평가 완료"로 표시되며, 다시 선택하면 기존 점수가 그대로 불러와져 수정 후 재저장할 수 있습니다.
-
-**3. 📊 종합 평가 결과 대시보드**
-전체 평가 등급 통계, 대상자별 종합 평균점수 표, 방사형 차트(개인 vs 전체 평균 비교), 역량 진단 요약 리포트를 확인할 수 있습니다. 표 아래 버튼으로 전체 결과를 CSV로 내려받을 수 있습니다.
-
-**4. 🔍 상세 조회**
-평가자별·대상자별로 개별 평가 기록을 검색하고, 평가자순/대상자순/등급순으로 정렬할 수 있습니다. 조회 결과는 엑셀(대상자별 대시보드 요약 시트 포함)로 내려받을 수 있습니다.
-"""
-
-ADMIN_MANUAL_TEXT = """
-**🛡️ 관리자 전용 (김남권 계정)**
-
-- 사이드바에서 현재 접속 중인 평가자 목록을 실시간으로 볼 수 있습니다(5분 이상 활동이 없으면 자동 제외).
-- [🛠️ 관리자] 탭에서 전체 평가 데이터를 조회하고, 평가자·대상자를 선택해 점수를 직접 수정하거나 삭제할 수 있습니다.
-- 삭제는 되돌릴 수 없으므로, 확인 체크박스를 누른 뒤에만 삭제 버튼이 활성화됩니다.
-"""
-
-CHANGELOG = [
-    {
-        "title": "평가 저장 즉시 반영 + 관리자 계정(김남권) 도입",
-        "desc": "저장 직후 완료 상태가 바로 반영되도록 수정하고, 대상자 재선택 시 기존 점수를 불러오도록 개선했습니다. 김남권 계정에 평가 데이터 수정/삭제 권한을 부여했습니다.",
-    },
-    {
-        "title": "상세조회 탭 엑셀 내보내기 추가",
-        "desc": "조회된 평가 기록과 대상자별 종합 대시보드 요약을 엑셀 파일(여러 시트)로 내려받을 수 있습니다.",
-    },
-    {
-        "title": "평가 항목 10개 → 5개로 개편",
-        "desc": "핵심 5개 항목으로 평가 항목을 간소화하고, 기존 평가 데이터를 새 기준(100점 만점 유지)으로 자동 환산했습니다.",
-    },
-    {
-        "title": "상세조회 표 정렬 기능 추가",
-        "desc": "평가자순 / 평가 대상자순 / 평가등급순(S~D)으로 표를 정렬할 수 있습니다.",
-    },
-    {
-        "title": "로그인 자동 유지 기능 제거",
-        "desc": "접속할 때마다 반드시 로그인하도록 변경했습니다(쿠키 기반 자동 로그인 제거).",
-    },
-    {
-        "title": "UI '모던 SaaS 대시보드' 스타일 적용 + 화면 구조 개편",
-        "desc": "바이올렛 포인트 컬러의 카드형 디자인을 전체 화면에 적용하고, 로그인 화면을 중앙 카드형으로, 상단 헤더를 슬림 바 형태로 재구성했습니다. 평가 입력 화면의 각 섹션도 카드로 구분했습니다.",
-    },
-    {
-        "title": "관리자용 '현재 접속 중인 평가자' 사이드바 패널 추가",
-        "desc": "김남권 관리자 계정으로 접속하면 사이드바에서 현재 접속 중인 평가자 목록을 실시간으로 확인할 수 있습니다.",
-    },
-    {
-        "title": "역량 진단 요약 리포트 및 방사형 차트 고도화",
-        "desc": "방사형 차트에 전체 평균 비교선과 순위·팀 평균 대비 지표를 추가하고, 요약 리포트에 항목별 팀 평균 대비 상세 비교표를 추가했습니다.",
-    },
-    {
-        "title": "시스템 사용 매뉴얼 / 업데이트 내역 사이드바 메뉴 추가",
-        "desc": "사이드바에서 시스템 사용법과 지금까지의 업데이트 내역을 바로 확인할 수 있습니다. 관리자 전용 매뉴얼은 김남권 계정에서만 표시됩니다.",
-    },
-]
-
-
-# -------------------------------------------------------------------
-# 👤 사이드바
-# -------------------------------------------------------------------
-st.sidebar.markdown("### 👤 접속자 정보")
-st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
-
-if is_admin:
-    st.sidebar.markdown("#### 🟢 현재 접속 중인 평가자")
-    _active_now = _get_currently_active_evaluators()
-    if _active_now:
-        for _name in _active_now:
-            _tag = " · 관리자" if _name in ADMIN_USERS else ""
-            st.sidebar.markdown(
-                f'<div style="display:flex;align-items:center;gap:7px;'
-                f'font-size:0.85rem;color:#334155;padding:2px 0;">'
-                f'<span style="width:8px;height:8px;border-radius:50%;'
-                f'background:#22C55E;display:inline-block;flex-shrink:0;"></span>'
-                f'{_name}{_tag}</div>',
-                unsafe_allow_html=True,
-            )
-    else:
-        st.sidebar.caption("현재 접속 중인 평가자가 없습니다.")
-    st.sidebar.caption("※ 5분 이상 활동이 없으면 자동으로 제외됩니다.")
-
-if st.sidebar.button("🚪 로그아웃", type="secondary"):
-    _clear_active_session(st.session_state.get("user_name"))
-    st.session_state["logged_in"] = False
-    st.session_state["user_name"] = None
-    st.rerun()
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📚 도움말")
-with st.sidebar.expander("📖 시스템 사용 매뉴얼"):
-    st.markdown(MANUAL_TEXT)
-    if is_admin:
-        st.markdown("---")
-        st.markdown(ADMIN_MANUAL_TEXT)
-
-with st.sidebar.expander("🕘 업데이트 내역"):
-    st.caption("최신 업데이트가 위에 표시됩니다.")
-    for _entry in reversed(CHANGELOG):
-        st.markdown(f"**• {_entry['title']}**")
-        st.caption(_entry["desc"])
-
-# -------------------------------------------------------------------
-# 🏷️ 메인 상단 바 — 슬림 한 줄 헤더 (아이콘 + 타이틀 + 부서명)
-# -------------------------------------------------------------------
-st.markdown(
-    '<div style="display:flex;align-items:center;gap:14px;padding:6px 0 18px 0;'
-    'border-bottom:1px solid #E2E8F0;margin-bottom:18px;">'
-    '<div style="width:40px;height:40px;border-radius:11px;background:#7C3AED;'
-    'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
-    'box-shadow:0 4px 10px rgba(124,58,237,0.28);">'
-    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" '
-    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
-    '<rect x="4" y="10" width="16" height="10" rx="1.5"></rect>'
-    '<path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
-    '</div>'
-    '<div style="display:flex;flex-direction:column;gap:1px;">'
-    '<span style="font-size:1.3rem;font-weight:800;color:#0F172A;line-height:1.25;">'
-    'PLC S/W 역량 진단 평가 시스템</span>'
-    '<span style="font-size:0.82rem;color:#64748B;font-weight:600;">'
-    '물류자동화그룹 · 공항사업섹션 · T1 T2 BHS운영</span>'
-    '</div>'
-    '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;">'
-    '<span style="font-size:0.85rem;font-weight:900;font-family:sans-serif;color:#94A3B8;">posco </span>'
-    '<span style="font-size:0.85rem;font-weight:900;font-family:sans-serif;color:#334155;">'
-    '포스코<span style="color:#7C3AED;">DX</span></span>'
-    '</div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-
-# -------------------------------------------------------------------
 # ☁️ 구글 시트 연동 설정
 # -------------------------------------------------------------------
 @st.cache_resource
@@ -781,6 +672,110 @@ def save_dataframe_to_sheet(df):
     st.cache_data.clear()
 
 
+def get_or_create_worksheet(title, header_row):
+    """지정한 이름의 보조 시트가 없으면 새로 만들고 헤더를 채운다.
+    (평가 확정 상태, 채팅 메시지처럼 평가 점수와는 별도로 관리해야 하는
+    정보를 담는 시트를 준비할 때 공통으로 사용한다.)"""
+    client = get_gspread_client()
+    sheet_url = st.secrets["private_gsheets_url"]
+    spreadsheet = client.open_by_url(sheet_url)
+    try:
+        ws = spreadsheet.worksheet(title)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = spreadsheet.add_worksheet(
+            title=title, rows=300, cols=max(len(header_row), 3)
+        )
+        ws.update([header_row])
+    return ws
+
+
+# -------------------------------------------------------------------
+# ✅ 평가 확정 상태 ("confirmations" 시트: evaluator, confirmed, confirmed_at)
+# 평가자가 본인의 모든 평가를 마친 뒤 "최종 확정"을 누르면 기록되는
+# 평가자별 진행 상태이다. (평가중 / 평가완료 / 평가확정 3단계 중 마지막 단계)
+# -------------------------------------------------------------------
+def get_confirmation_worksheet():
+    return get_or_create_worksheet(
+        "confirmations", ["evaluator", "confirmed", "confirmed_at"]
+    )
+
+
+@st.cache_data(ttl=10)
+def load_confirmations():
+    try:
+        ws = get_confirmation_worksheet()
+        records = ws.get_all_records()
+        result = {}
+        for r in records:
+            result[r.get("evaluator", "")] = {
+                "confirmed": str(r.get("confirmed", "")).strip()
+                in ("True", "TRUE", "1", "true"),
+                "confirmed_at": r.get("confirmed_at", ""),
+            }
+        return result
+    except Exception:
+        return {}
+
+
+def set_evaluator_confirmation(evaluator, confirmed):
+    """특정 평가자의 최종 확정 상태를 저장한다(이미 기록이 있으면 갱신, 없으면 추가)."""
+    ws = get_confirmation_worksheet()
+    records = ws.get_all_records()
+    now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    row_idx = None
+    for i, r in enumerate(records):
+        if r.get("evaluator") == evaluator:
+            row_idx = i + 2  # 헤더(1행) + 1-based 인덱스 보정
+            break
+    new_row = [evaluator, str(confirmed), now_str if confirmed else ""]
+    if row_idx:
+        ws.update(f"A{row_idx}:C{row_idx}", [new_row])
+    else:
+        ws.append_row(new_row)
+    load_confirmations.clear()
+
+
+def get_evaluator_progress_status(evaluator_name, all_data_df, confirmations):
+    """평가자 한 명의 진행 상태를 '평가중' / '평가완료' / '평가확정' 3단계로 계산한다."""
+    if confirmations.get(evaluator_name, {}).get("confirmed"):
+        return "평가확정"
+    if not all_data_df.empty and "evaluator" in all_data_df.columns:
+        done_count = len(all_data_df[all_data_df["evaluator"] == evaluator_name])
+    else:
+        done_count = 0
+    if done_count >= len(TARGETS):
+        return "평가완료"
+    return "평가중"
+
+
+# -------------------------------------------------------------------
+# 💬 접속자 간 채팅 ("chat_messages" 시트: timestamp, sender, message)
+# -------------------------------------------------------------------
+def get_chat_worksheet():
+    return get_or_create_worksheet(
+        "chat_messages", ["timestamp", "sender", "message"]
+    )
+
+
+@st.cache_data(ttl=5)
+def load_chat_messages():
+    try:
+        ws = get_chat_worksheet()
+        records = ws.get_all_records()
+        return records[-100:]  # 최근 100건만 사용 (시트가 무한정 길어지는 것 방지)
+    except Exception:
+        return []
+
+
+def send_chat_message(sender, message):
+    if not message or not message.strip():
+        return
+    ws = get_chat_worksheet()
+    now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    ws.append_row([now_str, sender, message.strip()[:500]])
+    load_chat_messages.clear()
+
+
 def migrate_legacy_items_if_needed():
     """평가 항목이 10개 → 5개로 개편되면서, 예전 스키마(10개 항목)로 저장된
     구글 시트 데이터를 새 스키마(5개 항목)로 1회성 변환한다.
@@ -837,6 +832,215 @@ def migrate_legacy_items_if_needed():
 if "legacy_items_migration_checked" not in st.session_state:
     migrate_legacy_items_if_needed()
     st.session_state["legacy_items_migration_checked"] = True
+
+
+
+# -------------------------------------------------------------------
+# 📚 사이드바 콘텐츠 — 시스템 사용 매뉴얼 / 업데이트 내역 (관리자 전용 항목 포함)
+# -------------------------------------------------------------------
+MANUAL_TEXT = """
+- **로그인**: 이름 선택 + 공동 비밀번호 입력 (접속마다 매번 로그인, 자동 로그인 없음)
+- **📝 평가 입력**: 대상자 선택 → 5개 항목 0~10점 입력 → [점수 저장 및 제출]. 완료한 대상자는 "✅ 평가 완료"로 표시되고, 다시 선택하면 기존 점수를 불러와 수정할 수 있습니다.
+- **✅ 최종 확정**: 모든 대상자를 다 평가하면 평가 입력 탭 하단에서 진행률을 확인하고 [평가 확정] 버튼을 누를 수 있습니다(확정 취소도 가능).
+- **📊 대시보드**: 등급 통계, 종합 점수 표, 방사형 차트(전체 평균 비교), 역량 요약 리포트, CSV 다운로드
+- **🔍 상세 조회**: 평가자·대상자별 검색/정렬(평가자순·대상자순·등급순), 엑셀 다운로드
+- **💬 채팅방**: 사이드바에서 다른 접속자와 간단한 메시지를 주고받을 수 있습니다.
+"""
+
+ADMIN_MANUAL_TEXT = """
+**🛡️ 관리자 전용 (김남권 계정)**
+- 사이드바: 현재 접속 중인 평가자 + 평가자별 진행 현황(평가중 / 평가완료 / 평가확정) 실시간 확인
+- [🛠️ 관리자] 탭: 평가자·대상자 필터 + 이름 검색, 점수 직접 수정·삭제 (삭제는 확인 체크박스 선택 후 가능)
+"""
+
+CHANGELOG = [
+    {
+        "title": "평가 저장 즉시 반영 + 관리자 계정(김남권) 도입",
+        "desc": "저장 직후 완료 상태가 바로 반영되도록 수정하고, 대상자 재선택 시 기존 점수를 불러오도록 개선했습니다. 김남권 계정에 평가 데이터 수정/삭제 권한을 부여했습니다.",
+    },
+    {
+        "title": "상세조회 탭 엑셀 내보내기 추가",
+        "desc": "조회된 평가 기록과 대상자별 종합 대시보드 요약을 엑셀 파일(여러 시트)로 내려받을 수 있습니다.",
+    },
+    {
+        "title": "평가 항목 10개 → 5개로 개편",
+        "desc": "핵심 5개 항목으로 평가 항목을 간소화하고, 기존 평가 데이터를 새 기준(100점 만점 유지)으로 자동 환산했습니다.",
+    },
+    {
+        "title": "상세조회 표 정렬 기능 추가",
+        "desc": "평가자순 / 평가 대상자순 / 평가등급순(S~D)으로 표를 정렬할 수 있습니다.",
+    },
+    {
+        "title": "로그인 자동 유지 기능 제거",
+        "desc": "접속할 때마다 반드시 로그인하도록 변경했습니다(쿠키 기반 자동 로그인 제거).",
+    },
+    {
+        "title": "UI '모던 SaaS 대시보드' 스타일 적용 + 화면 구조 개편",
+        "desc": "바이올렛 포인트 컬러의 카드형 디자인을 전체 화면에 적용하고, 로그인 화면을 중앙 카드형으로, 상단 헤더를 슬림 바 형태로 재구성했습니다. 평가 입력 화면의 각 섹션도 카드로 구분했습니다.",
+    },
+    {
+        "title": "관리자용 '현재 접속 중인 평가자' 사이드바 패널 추가",
+        "desc": "김남권 관리자 계정으로 접속하면 사이드바에서 현재 접속 중인 평가자 목록을 실시간으로 확인할 수 있습니다.",
+    },
+    {
+        "title": "역량 진단 요약 리포트 및 방사형 차트 고도화",
+        "desc": "방사형 차트에 전체 평균 비교선과 순위·팀 평균 대비 지표를 추가하고, 요약 리포트에 항목별 팀 평균 대비 상세 비교표를 추가했습니다.",
+    },
+    {
+        "title": "시스템 사용 매뉴얼 / 업데이트 내역 사이드바 메뉴 추가",
+        "desc": "사이드바에서 시스템 사용법과 지금까지의 업데이트 내역을 바로 확인할 수 있습니다. 관리자 전용 매뉴얼은 김남권 계정에서만 표시됩니다.",
+    },
+    {
+        "title": "화면 가독성 개선 (등급 표시 잘림 / 슬라이더 크기 / 선택창 대비)",
+        "desc": "사전 진단 현황의 등급 표시가 좁은 칸에서 잘리던 문제, 마지막 평가 항목 슬라이더만 유독 커 보이던 문제를 수정했습니다. 선택창·입력창에 은은한 배경색을 더해 카드 배경과 구분되도록 했습니다(로그인 화면 포함).",
+    },
+    {
+        "title": "관리자 탭에 필터/검색 기능 추가",
+        "desc": "전체 평가 데이터 표에도 상세조회와 동일한 평가자·대상자 필터를 적용하고, 이름 일부로 검색할 수 있는 검색창을 추가했습니다.",
+    },
+    {
+        "title": "평가자 최종 확정 기능 + 진행 현황 실시간 표시",
+        "desc": "평가자가 본인의 평가 결과를 확인하고 [평가 확정] 버튼을 누를 수 있는 기능을 추가했습니다. 관리자 사이드바에서 평가자별 진행 상태(평가중 / 평가완료 / 평가확정)를 실시간으로 확인할 수 있습니다.",
+    },
+    {
+        "title": "접속자 간 채팅방 기능 추가",
+        "desc": "사이드바에서 접속 중인 평가자들과 간단한 메시지를 주고받을 수 있는 채팅 기능을 추가했습니다.",
+    },
+]
+
+
+# -------------------------------------------------------------------
+# 👤 사이드바
+# -------------------------------------------------------------------
+st.sidebar.markdown("### 👤 접속자 정보")
+st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
+
+if is_admin:
+    st.sidebar.markdown("#### 🟢 현재 접속 중인 평가자")
+    _active_now = _get_currently_active_evaluators()
+    if _active_now:
+        for _name in _active_now:
+            _tag = " · 관리자" if _name in ADMIN_USERS else ""
+            st.sidebar.markdown(
+                f'<div style="display:flex;align-items:center;gap:7px;'
+                f'font-size:0.85rem;color:#334155;padding:2px 0;">'
+                f'<span style="width:8px;height:8px;border-radius:50%;'
+                f'background:#22C55E;display:inline-block;flex-shrink:0;"></span>'
+                f'{_name}{_tag}</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.sidebar.caption("현재 접속 중인 평가자가 없습니다.")
+    st.sidebar.caption("※ 5분 이상 활동이 없으면 자동으로 제외됩니다.")
+
+    st.sidebar.markdown("#### 📋 평가자별 진행 현황")
+    _progress_data_df = load_data()
+    _confirmations = load_confirmations()
+    _status_style = {
+        "평가확정": ("#22C55E", "#FFFFFF"),
+        "평가완료": ("#7C3AED", "#FFFFFF"),
+        "평가중": ("#E2E8F0", "#475569"),
+    }
+    for _ev in EVALUATORS:
+        _status = get_evaluator_progress_status(_ev, _progress_data_df, _confirmations)
+        _bg, _fg = _status_style[_status]
+        st.sidebar.markdown(
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'padding:3px 0;font-size:0.83rem;color:#334155;">'
+            f'<span>{_ev}</span>'
+            f'<span style="background:{_bg};color:{_fg};font-size:0.7rem;font-weight:700;'
+            f'padding:2px 8px;border-radius:999px;">{_status}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+if st.sidebar.button("🚪 로그아웃", type="secondary"):
+    _clear_active_session(st.session_state.get("user_name"))
+    st.session_state["logged_in"] = False
+    st.session_state["user_name"] = None
+    st.rerun()
+
+st.sidebar.markdown("---")
+
+# ---------------------------------------------------------------
+# 💬 접속자 간 채팅방 — 모든 로그인 사용자에게 노출
+# (Streamlit은 서버 푸시 없이 화면 재실행 시에만 갱신되므로, 완전한
+#  실시간 메신저는 아니고 화면이 갱신될 때마다 최신 메시지를 보여주는
+#  방식이다. 메시지를 보내면 즉시 rerun되어 본인 화면에는 바로 보인다.)
+# ---------------------------------------------------------------
+with st.sidebar.expander("💬 채팅방", expanded=False):
+    st.caption("접속자들과 간단한 메시지를 주고받을 수 있습니다. (다른 사람의 새 메시지는 화면이 갱신될 때 보입니다)")
+    _chat_msgs = load_chat_messages()
+    if not _chat_msgs:
+        st.caption("아직 채팅 메시지가 없습니다. 첫 메시지를 보내보세요!")
+    else:
+        for _msg in _chat_msgs[-30:]:
+            _sender = html.escape(str(_msg.get("sender", "")))
+            _text = html.escape(str(_msg.get("message", "")))
+            _ts = str(_msg.get("timestamp", ""))
+            _is_me = _msg.get("sender") == st.session_state.get("user_name")
+            _bubble_bg = "#EDE9FE" if _is_me else "#F8FAFC"
+            st.markdown(
+                f'<div style="background:{_bubble_bg};border:1px solid {"#DDD6FE" if _is_me else "#E2E8F0"};'
+                f'border-radius:10px;padding:6px 10px;margin-bottom:6px;font-size:0.8rem;">'
+                f'<b style="color:#7C3AED;">{_sender}</b> '
+                f'<span style="color:#94A3B8;font-size:0.7rem;">{_ts[-8:] if _ts else ""}</span><br>'
+                f'<span style="color:#334155;">{_text}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    with st.form("chat_form", clear_on_submit=True):
+        _chat_input = st.text_input(
+            "메시지 입력", label_visibility="collapsed", placeholder="메시지를 입력하세요..."
+        )
+        _chat_send = st.form_submit_button("보내기", use_container_width=True)
+        if _chat_send and _chat_input.strip():
+            send_chat_message(st.session_state.get("user_name"), _chat_input)
+            st.rerun()
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📚 도움말")
+with st.sidebar.expander("📖 시스템 사용 매뉴얼"):
+    st.markdown(MANUAL_TEXT)
+    if is_admin:
+        st.markdown("---")
+        st.markdown(ADMIN_MANUAL_TEXT)
+
+with st.sidebar.expander("🕘 업데이트 내역"):
+    st.caption("최신 업데이트가 위에 표시됩니다.")
+    for _entry in reversed(CHANGELOG):
+        st.markdown(f"**• {_entry['title']}**")
+        st.caption(_entry["desc"])
+
+# -------------------------------------------------------------------
+# 🏷️ 메인 상단 바 — 슬림 한 줄 헤더 (아이콘 + 타이틀 + 부서명)
+# -------------------------------------------------------------------
+st.markdown(
+    '<div style="display:flex;align-items:center;gap:14px;padding:6px 0 18px 0;'
+    'border-bottom:1px solid #E2E8F0;margin-bottom:18px;">'
+    '<div style="width:40px;height:40px;border-radius:11px;background:#7C3AED;'
+    'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
+    'box-shadow:0 4px 10px rgba(124,58,237,0.28);">'
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" '
+    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect x="4" y="10" width="16" height="10" rx="1.5"></rect>'
+    '<path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>'
+    '</div>'
+    '<div style="display:flex;flex-direction:column;gap:1px;">'
+    '<span style="font-size:1.3rem;font-weight:800;color:#0F172A;line-height:1.25;">'
+    'PLC S/W 역량 진단 평가 시스템</span>'
+    '<span style="font-size:0.82rem;color:#64748B;font-weight:600;">'
+    '물류자동화그룹 · 공항사업섹션 · T1 T2 BHS운영</span>'
+    '</div>'
+    '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;">'
+    '<span style="font-size:0.85rem;font-weight:900;font-family:sans-serif;color:#94A3B8;">posco </span>'
+    '<span style="font-size:0.85rem;font-weight:900;font-family:sans-serif;color:#334155;">'
+    '포스코<span style="color:#7C3AED;">DX</span></span>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
 
 
 # -------------------------------------------------------------------
@@ -1041,7 +1245,10 @@ with tab1:
         items_per_row = 2
         for i in range(0, len(ITEMS), items_per_row):
             row_items = ITEMS[i : i + items_per_row]
-            cols = st.columns(len(row_items))
+            # 항상 items_per_row 개의 칸을 만들어서, 마지막 줄에 항목이 하나만
+            # 남더라도 그 슬라이더가 혼자 전체 폭을 차지해 다른 항목들과 크기가
+            # 달라 보이지 않고 동일한 폭을 유지하도록 한다.
+            cols = st.columns(items_per_row)
             for j, item in enumerate(row_items):
                 with cols[j]:
                     if existing_row is not None:
@@ -1133,6 +1340,69 @@ with tab1:
                 st.rerun()
             except Exception as e:
                 st.error(f"저장 중 오류가 발생했습니다: {e}")
+
+    # ---------------------------------------------------------------
+    # 📋 내 평가 현황 모니터링 + 최종 확정
+    # 평가자가 본인이 지금까지 제출한 평가 결과를 한눈에 확인하고,
+    # 모든 대상자에 대한 평가를 마쳤을 때 "최종 확정"을 누를 수 있게 한다.
+    # 확정 여부는 별도의 confirmations 시트에 기록되며, 관리자 사이드바의
+    # "평가자별 진행 현황"(평가중/평가완료/평가확정)에 실시간으로 반영된다.
+    # ---------------------------------------------------------------
+    st.markdown("---")
+    with st.container(border=True):
+        st.markdown("**📋 내 평가 현황 및 최종 확정**")
+
+        _my_confirmations = load_confirmations()
+        _my_confirmed_info = _my_confirmations.get(evaluator, {})
+        _my_confirmed = _my_confirmed_info.get("confirmed", False)
+
+        _my_done_count = len(completed_targets)
+        _my_total_count = len(TARGETS)
+        _my_progress = _my_done_count / _my_total_count if _my_total_count else 0
+
+        st.progress(
+            _my_progress, text=f"{_my_done_count} / {_my_total_count}명 평가 완료"
+        )
+
+        if completed_rows_by_target:
+            _my_summary_rows = []
+            for _t, _row in completed_rows_by_target.items():
+                try:
+                    _t_score = (
+                        sum(float(_row[it]) for it in ITEMS) * SCORE_NORMALIZE_FACTOR
+                    )
+                except (ValueError, TypeError):
+                    _t_score = 0.0
+                _my_summary_rows.append(
+                    {
+                        "평가 대상자": _t,
+                        "합산 점수": round(_t_score, 1),
+                        "등급": calculate_grade(_t_score),
+                    }
+                )
+            _my_summary_df = pd.DataFrame(_my_summary_rows).sort_values("평가 대상자")
+            with st.expander(f"내가 제출한 평가 목록 보기 ({len(_my_summary_df)}건)"):
+                _my_html = _my_summary_df.to_html(
+                    index=False, escape=False, classes="styled-table"
+                )
+                st.markdown(CUSTOM_STYLE + _my_html, unsafe_allow_html=True)
+
+        if _my_confirmed:
+            st.success(f"✅ 평가확정 완료 ({_my_confirmed_info.get('confirmed_at', '')})")
+            if st.button("🔓 확정 취소", key="unconfirm_btn"):
+                set_evaluator_confirmation(evaluator, False)
+                st.rerun()
+        else:
+            if _my_done_count >= _my_total_count and _my_total_count > 0:
+                st.info("모든 대상자에 대한 평가를 완료하셨습니다. 최종 결과를 확인하신 후 확정해 주세요.")
+                if st.button("✅ 평가 확정", type="primary", key="confirm_btn"):
+                    set_evaluator_confirmation(evaluator, True)
+                    st.rerun()
+            else:
+                st.caption(
+                    f"전체 {_my_total_count}명 중 {_my_total_count - _my_done_count}명의 평가가 남아있습니다. "
+                    "모든 대상자를 평가하면 확정할 수 있습니다."
+                )
 
 # -------------------------------------------------------------------
 # TAB 2: 종합 평가 결과 대시보드
@@ -1580,6 +1850,7 @@ if is_admin:
             ).round(1)
 
             st.markdown("#### 📋 전체 평가 데이터")
+
             admin_display_df = df_admin.rename(
                 columns={"evaluator": "평가자", "target": "평가 대상자"}
             )
@@ -1588,10 +1859,54 @@ if is_admin:
             for item in ITEMS:
                 admin_display_df[item] = admin_display_df[item].round(1)
 
-            admin_html_table = admin_display_df.to_html(
-                index=False, escape=False, classes="styled-table"
-            )
-            st.markdown(CUSTOM_STYLE + admin_html_table, unsafe_allow_html=True)
+            # ---------------------------------------------------------
+            # 🔎 필터 + 검색 — 상세조회(탭3)와 동일한 평가자/대상자 필터에,
+            # 이름 일부만 입력해도 찾을 수 있는 검색창을 추가로 제공한다.
+            # ---------------------------------------------------------
+            admin_filter_col1, admin_filter_col2, admin_filter_col3 = st.columns(3)
+            with admin_filter_col1:
+                admin_filter_evaluator = st.selectbox(
+                    "👤 평가자 필터",
+                    ["전체"] + sorted(admin_display_df["평가자"].unique()),
+                    key="admin_filter_evaluator",
+                )
+            with admin_filter_col2:
+                admin_filter_target = st.selectbox(
+                    "🎯 평가 대상자 필터",
+                    ["전체"] + sorted(admin_display_df["평가 대상자"].unique()),
+                    key="admin_filter_target",
+                )
+            with admin_filter_col3:
+                admin_search_text = st.text_input(
+                    "🔍 이름 검색 (평가자/대상자 일부만 입력해도 검색됩니다)",
+                    key="admin_search_text",
+                )
+
+            admin_filtered_view_df = admin_display_df.copy()
+            if admin_filter_evaluator != "전체":
+                admin_filtered_view_df = admin_filtered_view_df[
+                    admin_filtered_view_df["평가자"] == admin_filter_evaluator
+                ]
+            if admin_filter_target != "전체":
+                admin_filtered_view_df = admin_filtered_view_df[
+                    admin_filtered_view_df["평가 대상자"] == admin_filter_target
+                ]
+            if admin_search_text.strip():
+                _kw = admin_search_text.strip()
+                admin_filtered_view_df = admin_filtered_view_df[
+                    admin_filtered_view_df["평가자"].str.contains(_kw, case=False, na=False)
+                    | admin_filtered_view_df["평가 대상자"].str.contains(_kw, case=False, na=False)
+                ]
+
+            st.caption(f"총 {len(admin_filtered_view_df)}건 조회됨 (전체 {len(admin_display_df)}건 중)")
+
+            if admin_filtered_view_df.empty:
+                st.info("조건에 맞는 평가 데이터가 없습니다.")
+            else:
+                admin_html_table = admin_filtered_view_df.to_html(
+                    index=False, escape=False, classes="styled-table"
+                )
+                st.markdown(CUSTOM_STYLE + admin_html_table, unsafe_allow_html=True)
 
             st.markdown("---")
             st.markdown("#### ✏️ 개별 평가 데이터 수정 / 삭제")
@@ -1631,7 +1946,7 @@ if is_admin:
                 items_per_row = 2
                 for i in range(0, len(ITEMS), items_per_row):
                     row_items = ITEMS[i : i + items_per_row]
-                    cols = st.columns(len(row_items))
+                    cols = st.columns(items_per_row)
                     for j, item in enumerate(row_items):
                         with cols[j]:
                             try:
