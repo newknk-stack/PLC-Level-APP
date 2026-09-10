@@ -94,24 +94,50 @@ CUSTOM_STYLE = f"""
         box-shadow: 0 6px 16px rgba(124, 58, 237, 0.36);
     }}
 
-    /* 선택 박스 / 입력창: 카드(흰 배경)와 구분되도록 은은한 배경 + 뚜렷한 테두리를 준다.
-       (배경색과 선택 칸이 비슷해서 구분이 안 된다는 피드백 반영 — 로그인 화면 포함 전체 적용) */
-    div[data-baseweb="select"] > div {{
-        background-color: {SURFACE_MUTED} !important;
+    /* 선택 박스 / 입력창: 카드(흰 배경)와 뚜렷이 구분되도록 은은한 바이올렛 톤 배경 +
+       또렷한 테두리를 준다.
+       (실제로 확인해보니, Streamlit의 selectbox는 버전에 따라 내부 DOM 구조가 아예
+       다르다 — 구버전은 [data-baseweb="select"] 기반이고, 최신 버전은 react-aria 기반
+       콤보박스(input[role="combobox"] + 감싸는 [role="group"])를 쓴다. 특히 최신 구조에서
+       테두리/배경이 그려지는 실제 요소([role="group"])의 기본 배경색이 페이지 배경색과
+       완전히 같아서(둘 다 #F1F5F9) 선택창이 안 보이는 문제였다. 두 구조 모두에 대응하도록
+       선택자를 전부 지정한다. 로그인 화면 포함 전체 적용.) */
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="select"] > div > div,
+    [data-testid="stSelectbox"] [role="group"] {{
+        background-color: {ACCENT_SOFT} !important;
         border-radius: 10px !important;
-        border: 1.5px solid {BORDER} !important;
     }}
-    div[data-baseweb="select"] > div:hover {{
+    div[data-baseweb="select"] > div,
+    [data-testid="stSelectbox"] [role="group"] {{
+        border: 1.5px solid #C4B5FD !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+    }}
+    div[data-baseweb="select"] > div:hover,
+    [data-testid="stSelectbox"] [role="group"]:hover,
+    [data-testid="stSelectbox"] [role="group"]:focus-within {{
         border-color: {ACCENT} !important;
     }}
-    div[data-baseweb="popover"] li {{
+    div[data-baseweb="select"] span,
+    [data-testid="stSelectbox"] input[role="combobox"] {{
+        color: {TEXT_MAIN} !important;
+        background-color: transparent !important;
+    }}
+    div[data-baseweb="popover"] li,
+    [role="listbox"] [role="option"] {{
         background-color: {SURFACE} !important;
+    }}
+    div[data-baseweb="popover"] li:hover,
+    [role="listbox"] [role="option"]:hover,
+    [role="listbox"] [role="option"][data-focused="true"] {{
+        background-color: {ACCENT_SOFT} !important;
     }}
     .stTextInput input,
     .stNumberInput input {{
-        background-color: {SURFACE_MUTED} !important;
+        background-color: {ACCENT_SOFT} !important;
         border-radius: 10px !important;
-        border: 1.5px solid {BORDER} !important;
+        border: 1.5px solid #C4B5FD !important;
     }}
     .stTextInput input:focus,
     .stNumberInput input:focus {{
