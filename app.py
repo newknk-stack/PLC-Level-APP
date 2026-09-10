@@ -1,7 +1,6 @@
 import time
 from io import BytesIO
 
-import extra_streamlit_components as stx
 from google.oauth2.service_account import Credentials
 import gspread
 import numpy as np
@@ -164,23 +163,17 @@ CUSTOM_STYLE = f"""
 st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
-# 🍪 쿠키 매니저 및 로그인 세션 제어
+# 🔐 로그인 세션 제어
 # -------------------------------------------------------------------
-cookie_manager = stx.CookieManager(key="cookie_manager")
-
+# 예전에는 쿠키에 로그인 정보를 24시간 동안 저장해서, 브라우저를 새로 열거나
+# 다시 접속해도 이전에 로그인했던 계정으로 자동 로그인되었다. 접속할 때마다
+# 반드시 로그인 화면을 거치도록, 로그인 상태는 쿠키가 아닌 이번 세션(브라우저
+# 탭 연결)에만 존재하는 st.session_state로만 관리한다 — 새로 접속하면 항상
+# 로그아웃 상태로 시작한다.
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "user_name" not in st.session_state:
     st.session_state["user_name"] = None
-if "logout_triggered" not in st.session_state:
-    st.session_state["logout_triggered"] = False
-
-# 쿠키에서 로그인 정보 복원
-if not st.session_state["logged_in"] and not st.session_state["logout_triggered"]:
-    saved_user = cookie_manager.get("logged_in_user")
-    if saved_user:
-        st.session_state["logged_in"] = True
-        st.session_state["user_name"] = saved_user
 
 # 평가 항목 (5선) 및 평가자/대상자 기본 정의
 ITEMS = [
@@ -500,9 +493,6 @@ if not st.session_state["logged_in"]:
             if input_pw == str(correct_pw):
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user_name
-                st.session_state["logout_triggered"] = False
-
-                cookie_manager.set("logged_in_user", user_name, max_age=86400)
 
                 st.success(f"반갑습니다, {user_name}님! 시스템에 접속합니다.")
                 time.sleep(0.3)
@@ -522,9 +512,6 @@ st.sidebar.info(f"현재 접속자: **{st.session_state['user_name']}** 님")
 if st.sidebar.button("🚪 로그아웃", type="secondary"):
     st.session_state["logged_in"] = False
     st.session_state["user_name"] = None
-    st.session_state["logout_triggered"] = True
-
-    cookie_manager.delete("logged_in_user")
     st.rerun()
 
 col_title, col_logo = st.columns([3.5, 2.5])
